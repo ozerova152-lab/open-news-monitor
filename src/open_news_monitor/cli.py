@@ -11,7 +11,6 @@ from .pipeline import run_monitor
 from .source_check import check_rss_source
 from .source_probe import probe_source_report
 from .status import read_status, render_status
-from .recipes import render_recipe_suggestions
 
 
 def main() -> None:
@@ -38,8 +37,6 @@ def main() -> None:
     )
     status = subparsers.add_parser("status", help="Show the health report from the last ordinary run.")
     status.add_argument("config", help="Path to a monitor JSON file.")
-    suggest = subparsers.add_parser("suggest-sources", help="Show optional checked source recipes for a topic.")
-    suggest.add_argument("topic", help="Topic in plain language, for example: AI agents or generative video.")
     args = parser.parse_args()
 
     if args.command == "check-source":
@@ -48,10 +45,6 @@ def main() -> None:
 
     if args.command == "probe-source":
         print(probe_source_report(args.url, args.name))
-        return
-
-    if args.command == "suggest-sources":
-        print(render_recipe_suggestions(args.topic))
         return
 
     if args.command == "init-monitor":

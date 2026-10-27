@@ -27,6 +27,3 @@ open-news-monitor = "open_news_monitor.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
-
-[tool.setuptools.package-data]
-open_news_monitor = ["catalog/*.json"]
