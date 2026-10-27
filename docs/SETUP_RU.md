@@ -4,8 +4,8 @@
 
 1. Установите Python 3.11 или новее.
 2. В папке репозитория выполните `pip install -e .`.
-3. Проверьте шаблон: `python -m open_news_monitor validate examples/ai-work-monitor.json`.
-4. Запустите без записи и рассылок: `python -m open_news_monitor run examples/ai-work-monitor.json --dry-run`.
+3. Проверьте нейтральный шаблон: `python -m open_news_monitor validate examples/basic-monitor.json`.
+4. Запустите без записи и рассылок: `python -m open_news_monitor run examples/basic-monitor.json --dry-run`.
 
 `--dry-run` показывает найденные карточки, но не создаёт базу, не меняет Google Sheets и не отправляет сообщения.
 
@@ -70,9 +70,9 @@ python -m open_news_monitor status config/local/my-monitor.json
 
 Для JSON-источника нужны поля `items`, `title`, `link` и `date`: `items` указывает на список публикаций в ответе API, остальные — на поля одной публикации. Открытый JSON-ответ проверяется тем же транспортом, что и рабочий сборщик; ключи и авторизация не поддерживаются.
 
-## Как настроить личный мониторинг ИИ
+## Как настроить любой личный мониторинг
 
-1. Скопируйте `examples/ai-work-monitor.json` в `my-ai-monitor.json`.
+1. Скопируйте `examples/basic-monitor.json` в `my-monitor.json`.
 2. Замените демонстрационный URL на RSS-ленты сайтов, которым доверяете.
 3. Добавьте слова в `include_any`; пустой список означает «брать все новые публикации из источника».
 4. Добавьте нежелательные слова в `exclude_any`.

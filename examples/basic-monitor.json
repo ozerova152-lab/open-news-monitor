@@ -1,0 +1,29 @@
+{
+  "monitor": {
+    "name": "My source monitor",
+    "timezone": "Europe/Moscow",
+    "database_path": "runtime/my-source-monitor.sqlite3"
+  },
+  "sources": [
+    {
+      "id": "replace-with-a-confirmed-source",
+      "name": "Replace with a confirmed source",
+      "kind": "rss",
+      "url": "https://example.org/feed.xml",
+      "enabled": true
+    }
+  ],
+  "filters": {
+    "include_any": [],
+    "exclude_any": []
+  },
+  "outputs": {
+    "markdown": {
+      "enabled": true,
+      "path": "runtime/my-source-monitor-digest.md"
+    },
+    "telegram": {"enabled": false},
+    "email": {"enabled": false, "recipients": []},
+    "google_sheets": {"enabled": false, "spreadsheet_id": "", "worksheet": "News"}
+  }
+}
