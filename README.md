@@ -35,8 +35,9 @@ python -m open_news_monitor run examples/ai-work-monitor.json --dry-run
 To start a real local monitor, copy the example configuration, replace the source URLs with feeds you trust, and run it without `--dry-run`:
 
 ```bash
-copy examples\\ai-work-monitor.json my-monitor.json
-python -m open_news_monitor run my-monitor.json
+mkdir config\\local
+copy examples\\ai-work-monitor.json config\\local\\my-monitor.json
+python -m open_news_monitor run config\\local\\my-monitor.json
 ```
 
 The first run creates the SQLite database and Markdown digest specified in the configuration. Runtime data is deliberately ignored by Git.
@@ -44,8 +45,10 @@ The first run creates the SQLite database and Markdown digest specified in the c
 Before enabling a real monitor for the first time, create a baseline. This records the current feed items without treating the entire archive as new:
 
 ```bash
-python -m open_news_monitor run my-monitor.json --initialize
+python -m open_news_monitor run config\\local\\my-monitor.json --initialize
 ```
+
+Keep real monitor profiles in `config/local/`. This folder is excluded from Git so a public repository never receives personal sources, delivery choices, or private work settings.
 
 ## Configure a monitor
 
