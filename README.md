@@ -15,6 +15,7 @@ Your sources -> new publications -> relevance rules -> deduplication
 
 - Monitor RSS, Atom, configured public HTML news pages, and public JSON endpoints; every source must expose a title, date, and direct link.
 - Safely probe a public URL before adding it: direct RSS/Atom, an advertised feed on the page, or an open JSON endpoint.
+- Offer a small optional catalog of verified source recipes by topic; suggestions never connect a source automatically.
 - Filter by clear include and exclude phrases.
 - Keep a local SQLite history so the same link is not delivered twice.
 - Produce a human-readable Markdown digest on every run.
