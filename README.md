@@ -13,7 +13,7 @@ Your sources -> new publications -> relevance rules -> deduplication
              -> SQLite history -> digest / Telegram / email / Google Sheets
 ```
 
-- Monitor RSS, Atom, and configured public HTML news pages; API adapters follow the same source contract.
+- Monitor RSS, Atom, configured public HTML news pages, and public JSON endpoints; every source must expose a title, date, and direct link.
 - Filter by clear include and exclude phrases.
 - Keep a local SQLite history so the same link is not delivered twice.
 - Produce a human-readable Markdown digest on every run.

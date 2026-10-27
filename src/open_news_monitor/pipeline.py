@@ -8,6 +8,7 @@ from .filtering import match_article
 from .models import Finding
 from .outputs import append_google_sheet, render_markdown, send_email, send_telegram, write_markdown
 from .html_collector import fetch_html
+from .json_collector import fetch_json
 from .rss import SourceFetchError, fetch_feed
 from .store import ArticleStore
 
@@ -29,7 +30,12 @@ def run_monitor(
     try:
         for source in enabled_sources(config):
             try:
-                articles = fetch_html(source) if source.kind == "html" else fetch_feed(source)
+                if source.kind == "html":
+                    articles = fetch_html(source)
+                elif source.kind == "json":
+                    articles = fetch_json(source)
+                else:
+                    articles = fetch_feed(source)
             except SourceFetchError as error:
                 errors.append(str(error))
                 continue

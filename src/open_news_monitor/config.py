@@ -44,18 +44,18 @@ def validate_config(config: dict) -> None:
         if source["id"] in identifiers:
             raise ConfigurationError(f"Source id must be unique: {source['id']}")
         identifiers.add(source["id"])
-        if source["kind"] not in {"rss", "atom", "html"}:
+        if source["kind"] not in {"rss", "atom", "html", "json"}:
             raise ConfigurationError(
-                f"Unsupported source kind '{source['kind']}'. Supported now: rss, atom, html."
+                f"Unsupported source kind '{source['kind']}'. Supported now: rss, atom, html, json."
             )
         if not str(source["url"]).startswith(("https://", "http://")):
             raise ConfigurationError(f"Source URL must start with http:// or https://: {source['id']}")
-        if source["kind"] == "html":
+        if source["kind"] in {"html", "json"}:
             selectors = source.get("selectors")
-            required = {"card", "title", "link", "date"}
+            required = {"card", "title", "link", "date"} if source["kind"] == "html" else {"items", "title", "link", "date"}
             if not isinstance(selectors, dict) or not required.issubset(selectors):
                 raise ConfigurationError(
-                    "An html source needs selectors for card, title, link, and date."
+                    f"A {source['kind']} source needs selectors for {', '.join(sorted(required))}."
                 )
 
     filters = config.get("filters", {})
