@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from .config import ConfigurationError, load_config
 from .initializer import create_monitor_interactively
@@ -9,6 +10,7 @@ from .local_env import load_local_env
 from .pipeline import run_monitor
 from .source_check import check_rss_source
 from .source_probe import probe_source_report
+from .status import read_status, render_status
 
 
 def main() -> None:
@@ -33,6 +35,8 @@ def main() -> None:
         action="store_true",
         help="Save the current feed items as a first-run baseline without sending them.",
     )
+    status = subparsers.add_parser("status", help="Show the health report from the last ordinary run.")
+    status.add_argument("config", help="Path to a monitor JSON file.")
     args = parser.parse_args()
 
     if args.command == "check-source":
@@ -57,6 +61,12 @@ def main() -> None:
 
     if args.command == "validate":
         print(f"Configuration is valid: {args.config}")
+        return
+
+    if args.command == "status":
+        database_path = config["monitor"].get("database_path", "runtime/open-news-monitor.sqlite3")
+        status_path = config["monitor"].get("status_path") or str(Path(database_path).with_suffix(".status.json"))
+        print(render_status(read_status(status_path)))
         return
 
     if args.dry_run and args.initialize:

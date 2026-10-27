@@ -18,6 +18,7 @@ Your sources -> new publications -> relevance rules -> deduplication
 - Filter by clear include and exclude phrases.
 - Keep a local SQLite history so the same link is not delivered twice.
 - Produce a human-readable Markdown digest on every run.
+- Save a local health report with the last run time, per-source availability, and errors.
 - Optionally send a digest to Telegram, email, or append records to Google Sheets.
 - Run safely in `--dry-run` mode before connecting any delivery channel.
 

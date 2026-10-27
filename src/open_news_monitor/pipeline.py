@@ -11,6 +11,7 @@ from .html_collector import fetch_html
 from .json_collector import fetch_json
 from .rss import SourceFetchError, fetch_feed
 from .store import ArticleStore
+from .status import write_status
 
 
 def run_monitor(
@@ -24,6 +25,7 @@ def run_monitor(
     detected_at = datetime.now(timezone.utc)
     errors: list[str] = []
     findings: list[Finding] = []
+    source_statuses: list[dict[str, object]] = []
 
     database_path = monitor.get("database_path", "runtime/open-news-monitor.sqlite3")
     store = None if dry_run else ArticleStore(database_path)
@@ -38,7 +40,9 @@ def run_monitor(
                     articles = fetch_feed(source)
             except SourceFetchError as error:
                 errors.append(str(error))
+                source_statuses.append({"name": source.name, "status": "error", "error": str(error)})
                 continue
+            source_statuses.append({"name": source.name, "status": "ok", "articles": len(articles)})
             for article in articles:
                 if store and store.has_seen(article.url):
                     continue
@@ -92,5 +96,18 @@ def run_monitor(
                 append_google_sheet(sheets["spreadsheet_id"], sheets.get("worksheet", "News"), findings)
             except RuntimeError as error:
                 errors.append(str(error))
+
+    status_path = monitor.get("status_path") or str(Path(database_path).with_suffix(".status.json"))
+    write_status(
+        status_path,
+        {
+            "monitor_name": monitor["name"],
+            "ran_at": detected_at.isoformat(),
+            "mode": "initialization" if initialize else "ordinary",
+            "new_matching_publications": len(findings),
+            "sources": source_statuses,
+            "errors": errors,
+        },
+    )
 
     return findings, errors, markdown
