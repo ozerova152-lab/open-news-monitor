@@ -21,6 +21,8 @@ class SourceCheck:
     def status(self) -> str:
         if self.error:
             return "Подключение следует отложить"
+        if not self.articles:
+            return "Нужна доработка"
         if self.dated_count == len(self.articles):
             return "Можно подключать"
         return "Нужна доработка"

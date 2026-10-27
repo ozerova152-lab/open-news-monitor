@@ -63,7 +63,7 @@ def fetch_json(source: Source, timeout_seconds: int = 20) -> list[Article]:
 def _field(value: object, path: str) -> object:
     current = value
     if not path:
-        return ""
+        return current
     for part in path.split("."):
         if not isinstance(current, dict):
             return ""

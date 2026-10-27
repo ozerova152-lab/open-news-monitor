@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from .source_check import SourceCheck, inspect_rss_source
+from .source_probe import SourceProbe, probe_source_url
 
 
 def create_monitor_interactively(
@@ -13,30 +14,44 @@ def create_monitor_interactively(
     *,
     input_func=input,
     output_func=print,
-    inspect_func=inspect_rss_source,
+    inspect_func=None,
+    probe_func=probe_source_url,
 ) -> Path:
-    """Create a safe RSS monitor profile from a short terminal interview."""
+    """Create a safe monitor profile from a short terminal interview."""
     destination = Path(path)
     name = input_func("Название мониторинга [My news monitor]: ").strip() or "My news monitor"
-    output_func("Добавьте публичные RSS/Atom URL по одному. Пустая строка завершит ввод.")
+    output_func("Добавьте публичные URL источников по одному. Пустая строка завершит ввод.")
 
     sources: list[dict] = []
     used_ids: set[str] = set()
     while True:
-        url = input_func("RSS/Atom URL: ").strip()
+        url = input_func("URL источника: ").strip()
         if not url:
             break
         source_name = input_func("Название источника [по домену]: ").strip() or urlparse(url).netloc
-        check: SourceCheck = inspect_func(url, source_name)
-        output_func(f"{source_name}: {check.status}")
-        if check.status != "Можно подключать":
-            output_func("Источник не добавлен. Сначала изучите отчёт команды check-source.")
+        if inspect_func is not None:
+            check: SourceCheck = inspect_func(url, source_name)
+            probe = SourceProbe(
+                source_name,
+                url,
+                check.status,
+                "RSS/Atom проверен.",
+                {"id": _source_id(url, used_ids), "name": source_name, "kind": "rss", "url": url, "enabled": True}
+                if check.status == "Можно подключать" and check.articles
+                else None,
+            )
+        else:
+            probe: SourceProbe = probe_func(url, source_name)
+        output_func(f"{source_name}: {probe.status}")
+        if probe.status != "Можно подключать" or not probe.source:
+            output_func("Источник не добавлен. Агент не смог подтвердить заголовок, дату и прямую ссылку через безопасный способ сбора.")
             continue
-        source_id = _source_id(url, used_ids)
+        source = dict(probe.source)
+        source_id = _source_id(source["url"], used_ids)
         used_ids.add(source_id)
-        sources.append(
-            {"id": source_id, "name": source_name, "kind": "rss", "url": url, "enabled": True}
-        )
+        source["id"] = source_id
+        source["name"] = source_name
+        sources.append(source)
         output_func(f"Источник добавлен: {source_name}")
 
     if not sources:

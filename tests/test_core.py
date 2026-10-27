@@ -13,6 +13,7 @@ from open_news_monitor.local_env import load_local_env
 from open_news_monitor.models import Article, Source
 from open_news_monitor.rss import fetch_feed
 from open_news_monitor.source_check import SourceCheck, check_rss_source
+from open_news_monitor.source_probe import SourceProbe
 from open_news_monitor.store import ArticleStore
 
 
@@ -57,6 +58,35 @@ class StoreTests(unittest.TestCase):
 
 
 class InitializerTests(unittest.TestCase):
+    def test_initializer_accepts_a_confirmed_json_source(self) -> None:
+        answers = iter(["JSON monitor", "https://example.org/api/articles", "Example", "", "", "", ""])
+        probe = SourceProbe(
+            "Example",
+            "https://example.org/api/articles",
+            "Можно подключать",
+            "Confirmed JSON",
+            {
+                "id": "example-org",
+                "name": "Example",
+                "kind": "json",
+                "url": "https://example.org/api/articles",
+                "enabled": True,
+                "selectors": {"items": "articles", "title": "title", "link": "url", "date": "published_at"},
+            },
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            target = Path(directory) / "monitor.json"
+            create_monitor_interactively(
+                target,
+                input_func=lambda _prompt: next(answers),
+                output_func=lambda _message: None,
+                probe_func=lambda _url, _name: probe,
+            )
+            config = target.read_text(encoding="utf-8")
+
+        self.assertIn('"kind": "json"', config)
+        self.assertIn('"items": "articles"', config)
+
     def test_initializer_writes_only_a_confirmed_source(self) -> None:
         answers = iter(["My AI monitor", "https://example.org/feed.xml", "Example", "", "agent, MCP", "vacancy", ""])
         article = Article("source", "Example", "Title", "https://example.org/article", "Summary", "2026-10-27")

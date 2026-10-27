@@ -8,6 +8,7 @@ from .initializer import create_monitor_interactively
 from .local_env import load_local_env
 from .pipeline import run_monitor
 from .source_check import check_rss_source
+from .source_probe import probe_source_report
 
 
 def main() -> None:
@@ -19,6 +20,9 @@ def main() -> None:
     source_check = subparsers.add_parser("check-source", help="Inspect a public RSS or Atom source without adding it.")
     source_check.add_argument("url", help="Public RSS or Atom URL.")
     source_check.add_argument("--name", default="Checked source", help="Human-readable source name for the report.")
+    source_probe = subparsers.add_parser("probe-source", help="Safely examine a public URL before adding it to a monitor.")
+    source_probe.add_argument("url", help="Public page, RSS/Atom, or JSON URL.")
+    source_probe.add_argument("--name", help="Optional human-readable source name.")
     init = subparsers.add_parser("init-monitor", help="Create a safe monitor profile through a short interview.")
     init.add_argument("config", help="Where to save the new JSON configuration.")
     run = subparsers.add_parser("run", help="Run one monitoring cycle.")
@@ -33,6 +37,10 @@ def main() -> None:
 
     if args.command == "check-source":
         print(check_rss_source(args.url, args.name))
+        return
+
+    if args.command == "probe-source":
+        print(probe_source_report(args.url, args.name))
         return
 
     if args.command == "init-monitor":
