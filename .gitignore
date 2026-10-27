@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+runtime/*
+!runtime/.gitkeep
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+*.db
+*.sqlite3
+*.egg-info/
+Материалы/

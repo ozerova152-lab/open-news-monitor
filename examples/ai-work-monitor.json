@@ -1,0 +1,43 @@
+{
+  "monitor": {
+    "name": "AI work monitor",
+    "timezone": "Europe/Moscow",
+    "database_path": "runtime/ai-work-monitor.sqlite3"
+  },
+  "sources": [
+    {
+      "id": "openai-news",
+      "name": "OpenAI News",
+      "kind": "rss",
+      "url": "https://openai.com/news/rss.xml",
+      "enabled": true
+    },
+    {
+      "id": "huggingface-blog",
+      "name": "Hugging Face Blog",
+      "kind": "rss",
+      "url": "https://huggingface.co/blog/feed.xml",
+      "enabled": true
+    },
+    {
+      "id": "google-ai-blog",
+      "name": "Google AI Blog",
+      "kind": "rss",
+      "url": "https://blog.google/technology/ai/rss/",
+      "enabled": true
+    }
+  ],
+  "filters": {
+    "include_any": ["AI", "agent", "automation", "LLM"],
+    "exclude_any": ["vacancy", "job opening"]
+  },
+  "outputs": {
+    "markdown": {
+      "enabled": true,
+      "path": "runtime/ai-work-digest.md"
+    },
+    "telegram": {"enabled": false},
+    "email": {"enabled": false},
+    "google_sheets": {"enabled": false, "spreadsheet_id": "", "worksheet": "News"}
+  }
+}
