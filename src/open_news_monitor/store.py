@@ -31,8 +31,8 @@ class ArticleStore:
         row = self.connection.execute("SELECT 1 FROM articles WHERE url = ?", (url,)).fetchone()
         return row is not None
 
-    def add(self, article: Article, detected_at: str, reason: str | None) -> None:
-        self.connection.execute(
+    def add(self, article: Article, detected_at: str, reason: str | None) -> bool:
+        cursor = self.connection.execute(
             """
             INSERT OR IGNORE INTO articles
             (url, source_id, source_name, title, summary, published_at, detected_at, matched_reason)
@@ -50,6 +50,7 @@ class ArticleStore:
             ),
         )
         self.connection.commit()
+        return cursor.rowcount == 1
 
     def close(self) -> None:
         self.connection.close()

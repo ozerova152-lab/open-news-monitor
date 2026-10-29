@@ -52,6 +52,18 @@ def check_rss_source(url: str, name: str = "Checked source") -> str:
             ]
         )
 
+    if not check.articles:
+        return "\n".join(
+            [
+                f"# Проверка источника: {check.name}",
+                "",
+                "**Статус: Нужна доработка**",
+                "",
+                "Причина: RSS/Atom-лента доступна, но в ней нет пригодных публикаций с заголовком и прямой ссылкой.",
+                "Источник не добавлен и никаких сообщений не отправлено.",
+            ]
+        )
+
     first = check.articles[0]
     lines = [
         f"# Проверка источника: {check.name}",

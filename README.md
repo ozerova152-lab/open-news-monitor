@@ -1,141 +1,84 @@
 # Open News Monitor
 
-**Self-hosted news monitoring, RSS alerts, and source-linked digests.**
+**A self-hosted, source-first news monitoring agent.**
 
-Open News Monitor watches the RSS feeds and public websites you choose, remembers what it has already seen, removes duplicates, and delivers only new matching publications to a Markdown digest, Telegram, email, or Google Sheets.
+Open News Monitor lets a person choose public sources, checks whether they can be collected safely, remembers what it has already seen, and creates a source-linked digest of new publications. It is a universal tool: the user chooses the subject and sources.
 
-It is designed for people and teams who need a dependable source monitor, not a black-box news feed. Every finding retains its source, publication date, original link, and the rule that matched it.
+It does not search the entire web, publish content, or replace human judgement.
 
-## What it does
+## Current capabilities
 
-```text
-Your sources -> new publications -> relevance rules -> deduplication
-             -> SQLite history -> digest / Telegram / email / Google Sheets
+- Check a public URL before adding it to a profile.
+- Connect RSS/Atom feeds and some public JSON sources after real publications have been confirmed.
+- Discover an RSS/Atom feed advertised by a regular web page.
+- Save a local SQLite history and avoid delivering the same link twice.
+- Create a safe first-run baseline: current publications are remembered but not delivered.
+- Create Markdown digests and local status reports.
+- Offer optional Telegram, email and Google Sheets settings. These delivery integrations are present in code but have **not** been end-to-end tested in this public project.
+
+Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet.
+
+## Windows quick start
+
+Requirements: Python 3.11 or newer. Open PowerShell in the repository folder:
+
+```powershell
+.\scripts\setup-windows.ps1
+.\scripts\create-monitor.ps1 -Name my-monitor
 ```
 
-- Monitor RSS, Atom, configured public HTML news pages, and public JSON endpoints; every source must expose a title, date, and direct link.
-- Safely probe a public URL before adding it: direct RSS/Atom, an advertised feed on the page, or an open JSON endpoint.
-- Filter by clear include and exclude phrases.
-- Keep a local SQLite history so the same link is not delivered twice.
-- Produce a human-readable Markdown digest on every run.
-- Save a local health report with the last run time, per-source availability, and errors.
-- Optionally send a digest to Telegram, email, or append records to Google Sheets.
-- Run safely in `--dry-run` mode before connecting any delivery channel.
+The wizard asks for source URLs one at a time, shows the check result, and asks for explicit confirmation before adding a source. Leave the delivery-choice field empty to keep the first run local: Markdown and SQLite only.
 
-## Quick start
+After the profile is created, the wizard offers to remember current publications as a safe starting point. Choose `Да` (or `yes`) to prevent existing feed entries from being delivered later. The profile is saved in `config/local/`, which Git ignores.
 
-Requirements: Python 3.11 or later.
+Run the monitor and view its status:
 
-```bash
-python -m venv .venv
-.venv\\Scripts\\activate        # Windows PowerShell
-pip install -e .
-python -m open_news_monitor validate examples/ai-work-monitor.json
-python -m open_news_monitor run examples/ai-work-monitor.json --dry-run
+```powershell
+.\.venv\Scripts\python.exe -m open_news_monitor run config\local\my-monitor.json
+.\.venv\Scripts\python.exe -m open_news_monitor status config\local\my-monitor.json
 ```
 
-To start a real local monitor, copy the example configuration, replace the source URLs with feeds you trust, and run it without `--dry-run`:
+If you decline the first-run baseline, run it later without delivery:
 
-```bash
-mkdir config\\local
-copy examples\\ai-work-monitor.json config\\local\\my-monitor.json
-python -m open_news_monitor run config\\local\\my-monitor.json
+```powershell
+.\.venv\Scripts\python.exe -m open_news_monitor run config\local\my-monitor.json --initialize
 ```
 
-The first run creates the SQLite database and Markdown digest specified in the configuration. Runtime data is deliberately ignored by Git.
+Some automated PowerShell input pipelines can corrupt Cyrillic confirmation text. In that case, use the safe equivalent `yes`. In normal interactive use the wizard also accepts `Да` and `д`.
 
-Before enabling a real monitor for the first time, create a baseline. This records the current feed items without treating the entire archive as new:
+## Source check results
 
-```bash
-python -m open_news_monitor run config\\local\\my-monitor.json --initialize
+`probe-source` and the setup wizard use four clear results:
+
+| Result | Meaning |
+| --- | --- |
+| `READY` | Real publications with title, date and direct link were confirmed. The source can be added after confirmation. |
+| `NEEDS_SETUP` | The site is reachable, but the current collector cannot safely connect it automatically. |
+| `UNSUPPORTED` | The available format is outside the current collector capabilities. |
+| `ERROR` | The check could not finish because of a technical problem. This does not mean the source is unsupported. |
+
+Check a URL without creating a profile:
+
+```powershell
+.\.venv\Scripts\python.exe -m open_news_monitor probe-source https://example.org/news
 ```
 
-Keep real monitor profiles in `config/local/`. This folder is excluded from Git so a public repository never receives personal sources, delivery choices, or private work settings.
+## What has been verified
 
-## Configure a monitor
+Local automated tests and a full temporary-profile check have verified RSS source checks, profile creation, first-run initialization, SQLite deduplication, status reporting, and partial failure handling. The real-source integration check used public GitHub Blog and Python Insider RSS feeds.
 
-The configuration is JSON so it works without an extra parser dependency. The key parts are:
+Still in development: a graphical interface, built-in scheduling, automatic analysis of arbitrary HTML pages, and end-to-end verification of Telegram, email and Google Sheets delivery.
 
-```json
-{
-  "monitor": {"name": "My source monitor", "timezone": "Europe/Moscow"},
-  "sources": [{"id": "trusted-feed", "name": "Trusted source", "kind": "rss", "url": "https://example.org/feed.xml", "enabled": true}],
-  "filters": {"include_any": ["AI", "agent"], "exclude_any": ["vacancy"]},
-  "outputs": {"markdown": {"enabled": true, "path": "runtime/latest_digest.md"}}
-}
-```
+## Privacy and safety
 
-`include_any` is optional. When it is empty, every new item from an enabled source matches. Categories such as `grant`, `announcement`, or `case study` are output labels added later; they are not hidden search queries.
-
-An HTML source must use selectors verified against one repeated publication card. The same card must contain title, date, and direct link:
-
-```json
-{
-  "id": "example-news",
-  "name": "Example news",
-  "kind": "html",
-  "url": "https://example.org/news",
-  "selectors": {
-    "card": "article.news-card",
-    "title": "h2 a",
-    "link": "h2 a",
-    "date": "time",
-    "summary": "p.summary"
-  }
-}
-```
-
-## Check a source before connecting it
-
-Use the same RSS/Atom parser as the monitor to inspect a public feed without changing configuration or sending messages:
-
-```bash
-python -m open_news_monitor check-source https://example.org/feed.xml --name "Example source"
-```
-
-The report confirms transport, titles, direct links, and available dates. It also states what it cannot establish, including feed pagination and archive completeness.
-
-## Create a monitor without hand-editing JSON
-
-The setup interview verifies each RSS/Atom URL before adding it and asks where the user wants results: Google Sheets, Telegram, email, or more than one of these. It keeps a local Markdown digest and SQLite history in every case:
-
-```bash
-python -m open_news_monitor init-monitor my-monitor.json
-```
-
-After the wizard writes the profile, create the first-run baseline before ordinary monitoring:
-
-```bash
-python -m open_news_monitor run my-monitor.json --initialize
-```
-
-## Delivery channels
-
-| Channel | Purpose | Status |
-| --- | --- | --- |
-| Markdown + SQLite | Local history and a readable digest | Included |
-| Telegram | Immediate alert or digest | Included; disabled until configured |
-| Email | Daily or weekly digest | Included; disabled until configured |
-| Google Sheets | Shared working register | Optional dependency and credentials |
-
-Use `.env.example` as a secret-free template. Never commit a bot token, SMTP password, chat ID, service-account key, or runtime database.
-
-## Product scope
-
-This project is a **source-first monitoring agent**. It does not claim to crawl the entire web, verify facts automatically, or publish content on a user's behalf. A person chooses the sources and makes the final editorial or business decision.
-
-## Current roadmap
-
-1. RSS/Atom collection, filters, deduplication, local history, first-run baseline, and safe outputs.
-2. Source-health checks and configurable website/API adapters.
-3. Setup wizard, Docker package, and optional AI-assisted summaries with explicit source links.
+Never commit bot tokens, chat IDs, SMTP passwords, Google service-account keys, `.env` files, personal profiles, or runtime databases. The included `.gitignore` excludes these local files.
 
 ## Documentation
 
 - [Russian README](README.ru.md)
-- [Configuration and delivery guide](docs/SETUP_RU.md)
+- [Russian Windows setup guide](docs/SETUP_RU.md)
 - [Project map](КАРТА_ПРОЕКТА.md)
-- [Source-research skill](skills/news-source-research/SKILL.md) — a maintained source-onboarding standard for AI contributors.
+- [Source research standard](skills/news-source-research/SKILL.md)
 
 ## License
 

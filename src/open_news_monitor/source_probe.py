@@ -2,22 +2,52 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from enum import StrEnum
+from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
+from xml.etree import ElementTree as ET
 
 from bs4 import BeautifulSoup
 
+from .json_collector import fetch_json
+from .models import Article, Source
 from .rss import USER_AGENT
 from .source_check import SourceCheck, inspect_rss_source
 
 
+class InspectionStatus(StrEnum):
+    READY = "READY"
+    NEEDS_SETUP = "NEEDS_SETUP"
+    UNSUPPORTED = "UNSUPPORTED"
+    ERROR = "ERROR"
+
+
+@dataclass(frozen=True)
+class SourceInspection:
+    """One safe, structured result for any public source URL."""
+
+    name: str
+    source_url: str
+    source_type: str | None
+    status: InspectionStatus
+    message: str
+    technical_reason: str | None = None
+    discovered_feed_url: str | None = None
+    title_confirmed: bool = False
+    date_confirmed: bool = False
+    link_confirmed: bool = False
+    publication_count: int = 0
+    source: dict | None = None
+
+    @property
+    def can_connect(self) -> bool:
+        return self.status is InspectionStatus.READY and self.source is not None
+
+
 @dataclass(frozen=True)
 class SourceProbe:
-    """Safe result of examining one user-supplied public URL.
-
-    A probe never changes a monitor.  `source` is present only when the same
-    transport used by the monitor has confirmed title, date and direct link.
-    """
+    """Legacy helper shape retained for existing wizard integrations."""
 
     name: str
     submitted_url: str
@@ -25,121 +55,132 @@ class SourceProbe:
     message: str
     source: dict | None = None
 
+    @property
+    def can_connect(self) -> bool:
+        return self.status in {"READY", "Можно подключать"} and self.source is not None
 
-def probe_source_url(url: str, name: str | None = None, timeout_seconds: int = 20) -> SourceProbe:
-    """Try a public URL as RSS/Atom, an advertised feed, then open JSON.
 
-    HTML is deliberately not guessed: a page is reported as needing a recipe
-    until title, date and direct link can be verified from one repeated card.
+def probe_source_url(url: str, name: str | None = None, timeout_seconds: int = 20) -> SourceInspection:
+    """Inspect a URL as RSS/Atom, advertised feed, JSON, or HTML.
+
+    A result is READY only when the collector has extracted real publications
+    containing title, date and direct link. HTML selector guessing is excluded.
     """
     source_name = name or _default_name(url)
     direct_feed = inspect_rss_source(url, source_name)
     if _is_confirmed_feed(direct_feed):
-        return SourceProbe(
-            source_name,
-            url,
-            "Можно подключать",
-            "Найдена RSS/Atom-лента. Заголовок, дата и прямая ссылка подтверждены.",
-            {"id": _source_id(url), "name": source_name, "kind": "rss", "url": url, "enabled": True},
-        )
+        return _ready_feed(source_name, url, direct_feed, discovered_feed_url=url)
 
     try:
         payload, content_type = _download(url, timeout_seconds)
-    except OSError as error:
-        return SourceProbe(
-            source_name,
-            url,
-            "Подключение следует отложить",
-            f"Источник недоступен через сборщик: {error}",
+    except (HTTPError, URLError, TimeoutError, OSError) as error:
+        return SourceInspection(
+            source_name, url, None, InspectionStatus.ERROR,
+            "Не удалось завершить проверку: источник временно недоступен или сервер вернул ошибку.",
+            technical_reason=str(error),
+        )
+
+    if _looks_like_feed(payload):
+        return SourceInspection(
+            source_name, url, _feed_type(payload), InspectionStatus.NEEDS_SETUP,
+            "Лента обнаружена, но в ней пока нет публикаций с подтверждёнными заголовком, датой и ссылкой.",
+            technical_reason=direct_feed.error or "No usable RSS/Atom publications were found.",
         )
 
     json_result = _probe_json(url, source_name, payload, content_type)
     if json_result is not None:
         return json_result
 
-    soup = BeautifulSoup(payload, "html.parser")
-    for feed_url in _advertised_feeds(soup, url):
-        check = inspect_rss_source(feed_url, source_name)
-        if _is_confirmed_feed(check):
-            return SourceProbe(
-                source_name,
-                url,
-                "Можно подключать",
-                "На странице найдена RSS/Atom-лента. Заголовок, дата и прямая ссылка подтверждены.",
-                {"id": _source_id(feed_url), "name": source_name, "kind": "rss", "url": feed_url, "enabled": True},
-            )
-
-    if "html" in content_type.lower() or b"<html" in payload[:500].lower():
-        return SourceProbe(
-            source_name,
-            url,
-            "Нужна доработка",
-            "Страница доступна, но безопасные селекторы карточки новости ещё не подтверждены. "
-            "Нужна проверка одной повторяющейся карточки с заголовком, датой и прямой ссылкой.",
+    if _looks_like_html(payload, content_type):
+        soup = BeautifulSoup(payload, "html.parser")
+        for feed_url in _advertised_feeds(soup, url):
+            check = inspect_rss_source(feed_url, source_name)
+            if _is_confirmed_feed(check):
+                return _ready_feed(source_name, url, check, discovered_feed_url=feed_url)
+            if _feed_appears_empty(check):
+                return SourceInspection(
+                    source_name, url, "rss", InspectionStatus.NEEDS_SETUP,
+                    "На странице найдена лента, но в ней пока нет публикаций с подтверждёнными полями.",
+                    technical_reason=check.error, discovered_feed_url=feed_url,
+                )
+        return SourceInspection(
+            source_name, url, "html", InspectionStatus.NEEDS_SETUP,
+            "Страница доступна, но для неё ещё не настроен безопасный способ извлечения новостей.",
+            technical_reason="No confirmed RSS/Atom feed or configured HTML card recipe.",
         )
-    return SourceProbe(
-        source_name,
-        url,
-        "Подключение следует отложить",
-        "Не удалось подтвердить RSS/Atom, открытый JSON или безопасную HTML-структуру публикаций.",
+
+    return SourceInspection(
+        source_name, url, None, InspectionStatus.UNSUPPORTED,
+        "Источник доступен, но его формат не поддерживается текущими механизмами.",
+        technical_reason=f"Unsupported content type: {content_type or 'not provided'}.",
     )
 
 
 def probe_source_report(url: str, name: str | None = None) -> str:
     result = probe_source_url(url, name)
     lines = [
-        f"# Проверка источника: {result.name}",
-        "",
-        f"**Статус: {result.status}**",
-        "",
-        f"- Исходный URL: {result.submitted_url}",
-        f"- Результат: {result.message}",
+        f"# Проверка источника: {result.name}", "",
+        f"**Статус: {result.status.value}**", "",
+        f"- Адрес: {result.source_url}",
+        f"- Тип: {result.source_type or 'не определён'}",
+        f"- Объяснение: {result.message}",
+        f"- Заголовок подтверждён: {'да' if result.title_confirmed else 'нет'}",
+        f"- Дата подтверждена: {'да' if result.date_confirmed else 'нет'}",
+        f"- Прямая ссылка подтверждена: {'да' if result.link_confirmed else 'нет'}",
     ]
-    if result.source:
-        lines.extend(
-            [
-                f"- Способ подключения: {result.source['kind'].upper()}",
-                f"- Рабочий URL: {result.source['url']}",
-                "- Первая инициализация: после подтверждения выполните `run ... --initialize`; старый архив не будет отправлен.",
-            ]
-        )
+    if result.discovered_feed_url:
+        lines.append(f"- Найденная RSS/Atom-лента: {result.discovered_feed_url}")
+    if result.technical_reason:
+        lines.append(f"- Техническая причина: {result.technical_reason}")
+    if result.can_connect:
+        lines.append("- Источник можно добавить в профиль. Перед обычным запуском создайте стартовую границу через `run ... --initialize`.")
     else:
         lines.append("- Источник не добавлен, сообщения не отправлялись.")
     return "\n".join(lines)
 
 
-def _download(url: str, timeout_seconds: int) -> tuple[bytes, str]:
-    request = Request(
-        url,
-        headers={"User-Agent": USER_AGENT, "Accept": "application/json,text/html,application/xhtml+xml"},
+def _ready_feed(name: str, submitted_url: str, check: SourceCheck, discovered_feed_url: str | None = None) -> SourceInspection:
+    source_url = discovered_feed_url or submitted_url
+    return SourceInspection(
+        name, submitted_url, "rss_or_atom", InspectionStatus.READY,
+        "Источник проверен: реальные публикации содержат заголовок, дату и прямую ссылку.",
+        discovered_feed_url=discovered_feed_url, title_confirmed=True,
+        date_confirmed=True, link_confirmed=True, publication_count=len(check.articles),
+        source={"id": _source_id(source_url), "name": name, "kind": "rss", "url": source_url, "enabled": True},
     )
-    with urlopen(request, timeout=timeout_seconds) as response:
-        return response.read(), response.headers.get("Content-Type", "")
 
 
-def _probe_json(url: str, name: str, payload: bytes, content_type: str) -> SourceProbe | None:
+def _probe_json(url: str, name: str, payload: bytes, content_type: str) -> SourceInspection | None:
     if "json" not in content_type.lower() and not payload.lstrip().startswith((b"{", b"[")):
         return None
     try:
         document = json.loads(payload.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
-        return SourceProbe(name, url, "Нужна доработка", "Ответ похож на JSON, но не читается как корректный публичный JSON.")
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        return SourceInspection(name, url, "json", InspectionStatus.ERROR, "Сервер вернул некорректный JSON, поэтому проверка не завершена.", technical_reason=str(error))
 
     mapping = _infer_json_mapping(document)
     if mapping is None:
-        return SourceProbe(
-            name,
-            url,
-            "Нужна доработка",
-            "Открытый JSON доступен, но в нём не удалось безопасно распознать список публикаций с заголовком, датой и прямой ссылкой.",
-        )
-    return SourceProbe(
-        name,
-        url,
-        "Можно подключать",
-        "Открытый JSON подтверждён: найдены список публикаций, заголовок, дата и прямая ссылка.",
-        {"id": _source_id(url), "name": name, "kind": "json", "url": url, "enabled": True, "selectors": mapping},
+        return SourceInspection(name, url, "json", InspectionStatus.NEEDS_SETUP, "Открытый JSON найден, но агенту нужна дополнительная настройка полей публикации.", technical_reason="Could not safely identify publication list, title, date and direct link fields.")
+    source = Source(id=_source_id(url), name=name, kind="json", url=url, selectors=mapping)
+    try:
+        articles = fetch_json(source)
+    except Exception as error:
+        return SourceInspection(name, url, "json", InspectionStatus.ERROR, "JSON найден, но реальные публикации не удалось подтвердить рабочим сборщиком.", technical_reason=str(error))
+    title, date, link = _article_fields_confirmed(articles)
+    if not all((title, date, link)):
+        return SourceInspection(name, url, "json", InspectionStatus.NEEDS_SETUP, "JSON доступен, но не все обязательные поля публикаций подтверждены.", title_confirmed=title, date_confirmed=date, link_confirmed=link, publication_count=len(articles))
+    return SourceInspection(
+        name, url, "json", InspectionStatus.READY,
+        "Источник проверен: реальные JSON-публикации содержат заголовок, дату и прямую ссылку.",
+        title_confirmed=True, date_confirmed=True, link_confirmed=True, publication_count=len(articles),
+        source={"id": _source_id(url), "name": name, "kind": "json", "url": url, "enabled": True, "selectors": mapping},
     )
+
+
+def _download(url: str, timeout_seconds: int) -> tuple[bytes, str]:
+    request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json,text/html,application/xhtml+xml,application/rss+xml,application/atom+xml"})
+    with urlopen(request, timeout=timeout_seconds) as response:
+        return response.read(), response.headers.get("Content-Type", "")
 
 
 def _infer_json_mapping(document: object) -> dict[str, str] | None:
@@ -184,6 +225,35 @@ def _advertised_feeds(soup: BeautifulSoup, page_url: str) -> list[str]:
 
 def _is_confirmed_feed(check: SourceCheck) -> bool:
     return check.status == "Можно подключать" and bool(check.articles)
+
+
+def _feed_appears_empty(check: SourceCheck) -> bool:
+    return bool(check.error and "No RSS or Atom entries" in check.error)
+
+
+def _article_fields_confirmed(articles: list[Article]) -> tuple[bool, bool, bool]:
+    return (
+        bool(articles) and all(bool(article.title) for article in articles),
+        bool(articles) and all(bool(article.published_at) for article in articles),
+        bool(articles) and all(bool(article.url) for article in articles),
+    )
+
+
+def _looks_like_feed(payload: bytes) -> bool:
+    try:
+        root = ET.fromstring(payload)
+    except ET.ParseError:
+        return False
+    return root.tag.rsplit("}", 1)[-1].lower() in {"rss", "feed", "rdf"}
+
+
+def _feed_type(payload: bytes) -> str:
+    root = ET.fromstring(payload)
+    return "atom" if root.tag.rsplit("}", 1)[-1].lower() == "feed" else "rss"
+
+
+def _looks_like_html(payload: bytes, content_type: str) -> bool:
+    return "html" in content_type.lower() or b"<html" in payload[:500].lower()
 
 
 def _default_name(url: str) -> str:

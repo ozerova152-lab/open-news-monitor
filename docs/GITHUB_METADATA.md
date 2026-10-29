@@ -8,7 +8,7 @@ Apply these values in the repository's **About** panel when the remote GitHub re
 
 ## Description
 
-Self-hosted news monitoring agent for RSS feeds and public websites. Deduplicated, source-linked alerts in Telegram, email, and Google Sheets.
+Self-hosted, source-first news monitoring agent for RSS feeds and public websites. Deduplicated, source-linked local digests with optional delivery integrations.
 
 ## Suggested topics
 
