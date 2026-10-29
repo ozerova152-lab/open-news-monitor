@@ -40,6 +40,15 @@ def render_status(status: dict[str, Any] | None) -> str:
             lines.append(f"- {source.get('name', 'Источник')}: доступен, получено {source.get('articles', 0)} публикаций")
         else:
             lines.append(f"- {source.get('name', 'Источник')}: ошибка — {source.get('error', 'неизвестная ошибка')}")
+    telegram = status.get("deliveries", {}).get("telegram")
+    if telegram:
+        lines.extend([
+            "",
+            "## Telegram",
+            "",
+            f"- Состояние: {telegram.get('status', 'неизвестно')}",
+            f"- В очереди: {telegram.get('queued', 0)}; подтверждённо отправлено: {telegram.get('sent', 0)}; ожидают повтора: {telegram.get('failed', 0)}",
+        ])
     errors = status.get("errors", [])
     if errors:
         lines.extend(["", "## Ошибки", "", *[f"- {error}" for error in errors]])

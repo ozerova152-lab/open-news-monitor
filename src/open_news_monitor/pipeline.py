@@ -73,10 +73,12 @@ def run_monitor(
     errors: list[str] = []
     findings: list[Finding] = []
     source_statuses: list[dict[str, object]] = []
+    delivery_status: dict[str, object] = {"telegram": {"status": "disabled", "queued": 0, "sent": 0, "failed": 0}}
 
     database_path = monitor.get("database_path", "runtime/open-news-monitor.sqlite3")
     store = None if dry_run else ArticleStore(database_path)
     try:
+        telegram_enabled = bool(config.get("outputs", {}).get("telegram", {}).get("enabled"))
         for source in enabled_sources(config):
             saved = 0
             try:
@@ -95,72 +97,97 @@ def run_monitor(
                 if store and store.has_seen(article.url):
                     continue
                 reason = match_article(article, include_any, exclude_any)
-                if store and store.add(article, detected_at.isoformat(), reason):
+                enqueue_telegram = bool(reason and not initialize and telegram_enabled)
+                if store and store.add_with_telegram_queue(
+                    article, detected_at.isoformat(), reason, enqueue_telegram=enqueue_telegram
+                ):
                     saved += 1
                 if reason and not initialize:
                     findings.append(Finding(article=article, reason=reason, detected_at=detected_at))
             source_statuses.append({"name": source.name, "status": "ok", "articles": len(articles), "saved": saved})
+
+        markdown = render_markdown(monitor["name"], findings, errors)
+        if initialize:
+            markdown = markdown.replace(
+                "New matching publications: **0**",
+                "Initial baseline saved. Existing feed items were recorded without delivery.",
+            ).replace("No new matching publications were found.", "The next ordinary run will deliver only publications that appear after this baseline.")
+        if dry_run:
+            return findings, errors, markdown
+
+        if initialization_report is not None:
+            initialization_report.sources.extend(source_statuses)
+            initialization_report.errors.extend(errors)
+
+        outputs = config.get("outputs", {})
+        markdown_output = outputs.get("markdown", {})
+        if markdown_output.get("enabled", True):
+            write_markdown(markdown_output.get("path", "runtime/latest_digest.md"), markdown)
+
+        telegram = outputs.get("telegram", {})
+        if telegram.get("enabled") and not initialize and store:
+            queued = store.pending_telegram_findings()
+            telegram_status = delivery_status["telegram"]
+            telegram_status["queued"] = len(queued)
+            if not queued:
+                telegram_status["status"] = "not_needed"
+            else:
+                confirmed_urls: list[str] = []
+
+                def confirm(chunk: list[Finding]) -> None:
+                    urls = [finding.article.url for finding in chunk]
+                    store.mark_telegram_sent(urls, detected_at.isoformat())
+                    confirmed_urls.extend(urls)
+
+                try:
+                    send_telegram(monitor["name"], queued, on_confirmed=confirm)
+                    telegram_status["status"] = "sent"
+                    telegram_status["sent"] = len(confirmed_urls)
+                except Exception as error:
+                    message = f"Telegram delivery was not confirmed: {error}"
+                    remaining_urls = [finding.article.url for finding in queued if finding.article.url not in confirmed_urls]
+                    store.mark_telegram_failed(remaining_urls, message, detected_at.isoformat())
+                    telegram_status["status"] = "partial" if confirmed_urls else "failed"
+                    telegram_status["sent"] = len(confirmed_urls)
+                    telegram_status["failed"] = len(remaining_urls)
+                    errors.append(message)
+
+        email = outputs.get("email", {})
+        if email.get("enabled") and findings and not initialize:
+            recipients = email.get("recipients", [])
+            if not recipients:
+                errors.append("Email is enabled but outputs.email.recipients is empty.")
+            else:
+                try:
+                    send_email(monitor["name"], recipients, findings)
+                except RuntimeError as error:
+                    errors.append(str(error))
+
+        sheets = outputs.get("google_sheets", {})
+        if sheets.get("enabled") and findings and not initialize:
+            if not sheets.get("spreadsheet_id"):
+                errors.append("Google Sheets is enabled but outputs.google_sheets.spreadsheet_id is empty.")
+            else:
+                try:
+                    append_google_sheet(sheets["spreadsheet_id"], sheets.get("worksheet", "News"), findings)
+                except RuntimeError as error:
+                    errors.append(str(error))
+
+        status_path = monitor.get("status_path") or str(Path(database_path).with_suffix(".status.json"))
+        write_status(
+            status_path,
+            {
+                "monitor_name": monitor["name"],
+                "ran_at": detected_at.isoformat(),
+                "mode": "initialization" if initialize else "ordinary",
+                "new_matching_publications": len(findings),
+                "sources": source_statuses,
+                "deliveries": delivery_status,
+                "errors": errors,
+            },
+        )
+
+        return findings, errors, markdown
     finally:
         if store:
             store.close()
-
-    markdown = render_markdown(monitor["name"], findings, errors)
-    if initialize:
-        markdown = markdown.replace(
-            "New matching publications: **0**",
-            "Initial baseline saved. Existing feed items were recorded without delivery.",
-        ).replace("No new matching publications were found.", "The next ordinary run will deliver only publications that appear after this baseline.")
-    if dry_run:
-        return findings, errors, markdown
-
-    if initialization_report is not None:
-        initialization_report.sources.extend(source_statuses)
-        initialization_report.errors.extend(errors)
-
-    outputs = config.get("outputs", {})
-    markdown_output = outputs.get("markdown", {})
-    if markdown_output.get("enabled", True):
-        write_markdown(markdown_output.get("path", "runtime/latest_digest.md"), markdown)
-
-    telegram = outputs.get("telegram", {})
-    if telegram.get("enabled") and findings and not initialize:
-        try:
-            send_telegram(monitor["name"], findings)
-        except RuntimeError as error:
-            errors.append(str(error))
-
-    email = outputs.get("email", {})
-    if email.get("enabled") and findings and not initialize:
-        recipients = email.get("recipients", [])
-        if not recipients:
-            errors.append("Email is enabled but outputs.email.recipients is empty.")
-        else:
-            try:
-                send_email(monitor["name"], recipients, findings)
-            except RuntimeError as error:
-                errors.append(str(error))
-
-    sheets = outputs.get("google_sheets", {})
-    if sheets.get("enabled") and findings and not initialize:
-        if not sheets.get("spreadsheet_id"):
-            errors.append("Google Sheets is enabled but outputs.google_sheets.spreadsheet_id is empty.")
-        else:
-            try:
-                append_google_sheet(sheets["spreadsheet_id"], sheets.get("worksheet", "News"), findings)
-            except RuntimeError as error:
-                errors.append(str(error))
-
-    status_path = monitor.get("status_path") or str(Path(database_path).with_suffix(".status.json"))
-    write_status(
-        status_path,
-        {
-            "monitor_name": monitor["name"],
-            "ran_at": detected_at.isoformat(),
-            "mode": "initialization" if initialize else "ordinary",
-            "new_matching_publications": len(findings),
-            "sources": source_statuses,
-            "errors": errors,
-        },
-    )
-
-    return findings, errors, markdown

@@ -45,22 +45,27 @@ def write_markdown(path: str | Path, content: str) -> None:
     output_path.write_text(content, encoding="utf-8")
 
 
-def send_telegram(monitor_name: str, findings: list[Finding]) -> None:
+TELEGRAM_MESSAGE_LIMIT = 4096
+
+
+def send_telegram(monitor_name: str, findings: list[Finding], *, on_confirmed=None) -> None:
     token = os.getenv("ONM_TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("ONM_TELEGRAM_CHAT_ID")
     if not token or not chat_id:
         raise RuntimeError("Telegram is enabled but ONM_TELEGRAM_BOT_TOKEN or ONM_TELEGRAM_CHAT_ID is missing.")
-    text = _plain_digest(monitor_name, findings)
-    request = Request(
-        f"https://api.telegram.org/bot{token}/sendMessage",
-        data=f"chat_id={quote(chat_id)}&text={quote(text)}&disable_web_page_preview=true".encode(),
-        headers={"Content-Type": "application/x-www-form-urlencoded"},
-        method="POST",
-    )
-    with urlopen(request, timeout=20) as response:
-        payload = json.loads(response.read().decode("utf-8"))
-    if not payload.get("ok"):
-        raise RuntimeError(f"Telegram rejected the message: {payload}")
+    for text, chunk in telegram_message_chunks(monitor_name, findings):
+        request = Request(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            data=f"chat_id={quote(chat_id)}&text={quote(text)}&disable_web_page_preview=true".encode(),
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urlopen(request, timeout=20) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not payload.get("ok"):
+            raise RuntimeError(f"Telegram rejected the message: {payload}")
+        if on_confirmed is not None:
+            on_confirmed(chunk)
 
 
 def send_email(monitor_name: str, recipients: list[str], findings: list[Finding]) -> None:
@@ -127,3 +132,52 @@ def _plain_digest(monitor_name: str, findings: list[Finding]) -> str:
     if len(findings) > 10:
         lines.append(f"\nAnd {len(findings) - 10} more item(s) in the full digest.")
     return "\n".join(lines)
+
+
+def telegram_message_chunks(
+    monitor_name: str, findings: list[Finding], *, max_chars: int = TELEGRAM_MESSAGE_LIMIT
+) -> list[tuple[str, list[Finding]]]:
+    """Split a Telegram digest without splitting or silently dropping publications."""
+    if max_chars < 64:
+        raise ValueError("Telegram message limit is too small.")
+    header = f"{monitor_name}: {len(findings)} new matching publication(s)"
+    chunks: list[tuple[str, list[Finding]]] = []
+    current_lines = [header]
+    current_findings: list[Finding] = []
+
+    for finding in findings:
+        entry = _telegram_entry(finding)
+        available = max_chars - len(header) - 2
+        if len(entry) > available:
+            entry = _shorten_telegram_entry(finding, available)
+        candidate = "\n".join([*current_lines, "", entry])
+        if len(candidate) <= max_chars:
+            current_lines.extend(["", entry])
+            current_findings.append(finding)
+            continue
+        if current_findings:
+            chunks.append(("\n".join(current_lines), current_findings))
+            current_lines = [header, "", entry]
+            current_findings = [finding]
+        else:
+            raise ValueError("A Telegram publication cannot fit into one message while preserving its direct link.")
+
+    if current_findings:
+        chunks.append(("\n".join(current_lines), current_findings))
+    return chunks
+
+
+def _telegram_entry(finding: Finding) -> str:
+    article = finding.article
+    return f"{article.title}\n{article.source_name} | {article.url}"
+
+
+def _shorten_telegram_entry(finding: Finding, available: int) -> str:
+    article = finding.article
+    fixed = f"\n{article.source_name} | {article.url}"
+    title_space = available - len(fixed)
+    if title_space < 1:
+        raise ValueError("A Telegram publication cannot fit into one message while preserving its direct link.")
+    if len(article.title) <= title_space:
+        return _telegram_entry(finding)
+    return f"{article.title[:max(1, title_space - 1)]}…{fixed}"
