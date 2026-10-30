@@ -40,14 +40,16 @@ def render_status(status: dict[str, Any] | None) -> str:
             lines.append(f"- {source.get('name', 'Источник')}: доступен, получено {source.get('articles', 0)} публикаций")
         else:
             lines.append(f"- {source.get('name', 'Источник')}: ошибка — {source.get('error', 'неизвестная ошибка')}")
-    telegram = status.get("deliveries", {}).get("telegram")
-    if telegram:
+    for channel, label in (("telegram", "Telegram"), ("email", "Email"), ("google_sheets", "Google Sheets")):
+        delivery = status.get("deliveries", {}).get(channel)
+        if not delivery:
+            continue
         lines.extend([
             "",
-            "## Telegram",
+            f"## {label}",
             "",
-            f"- Состояние: {telegram.get('status', 'неизвестно')}",
-            f"- В очереди: {telegram.get('queued', 0)}; подтверждённо отправлено: {telegram.get('sent', 0)}; ожидают повтора: {telegram.get('failed', 0)}",
+            f"- Состояние: {delivery.get('status', 'неизвестно')}",
+            f"- В очереди: {delivery.get('queued', 0)}; подтверждённо отправлено: {delivery.get('sent', 0)}; ожидают повтора: {delivery.get('failed', 0)}",
         ])
     errors = status.get("errors", [])
     if errors:

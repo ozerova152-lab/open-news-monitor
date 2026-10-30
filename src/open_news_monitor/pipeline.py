@@ -73,12 +73,21 @@ def run_monitor(
     errors: list[str] = []
     findings: list[Finding] = []
     source_statuses: list[dict[str, object]] = []
-    delivery_status: dict[str, object] = {"telegram": {"status": "disabled", "queued": 0, "sent": 0, "failed": 0}}
+    delivery_status: dict[str, object] = {
+        "telegram": {"status": "disabled", "queued": 0, "sent": 0, "failed": 0},
+        "email": {"status": "disabled", "queued": 0, "sent": 0, "failed": 0},
+        "google_sheets": {"status": "disabled", "queued": 0, "sent": 0, "failed": 0},
+    }
 
     database_path = monitor.get("database_path", "runtime/open-news-monitor.sqlite3")
     store = None if dry_run else ArticleStore(database_path)
     try:
         telegram_enabled = bool(config.get("outputs", {}).get("telegram", {}).get("enabled"))
+        email_enabled = bool(config.get("outputs", {}).get("email", {}).get("enabled"))
+        sheets_config = config.get("outputs", {}).get("google_sheets", {})
+        sheets_target = None
+        if sheets_config.get("enabled") and sheets_config.get("spreadsheet_id"):
+            sheets_target = (sheets_config["spreadsheet_id"], sheets_config.get("worksheet", "News"))
         for source in enabled_sources(config):
             saved = 0
             try:
@@ -98,8 +107,14 @@ def run_monitor(
                     continue
                 reason = match_article(article, include_any, exclude_any)
                 enqueue_telegram = bool(reason and not initialize and telegram_enabled)
-                if store and store.add_with_telegram_queue(
-                    article, detected_at.isoformat(), reason, enqueue_telegram=enqueue_telegram
+                enqueue_email = bool(reason and not initialize and email_enabled)
+                if store and store.add_with_delivery_queues(
+                    article,
+                    detected_at.isoformat(),
+                    reason,
+                    enqueue_telegram=enqueue_telegram,
+                    enqueue_email=enqueue_email,
+                    google_sheets_target=sheets_target if reason and not initialize else None,
                 ):
                     saved += 1
                 if reason and not initialize:
@@ -153,25 +168,78 @@ def run_monitor(
                     errors.append(message)
 
         email = outputs.get("email", {})
-        if email.get("enabled") and findings and not initialize:
-            recipients = email.get("recipients", [])
-            if not recipients:
-                errors.append("Email is enabled but outputs.email.recipients is empty.")
+        if email.get("enabled") and not initialize and store:
+            queued = store.pending_email_findings()
+            email_status = delivery_status["email"]
+            email_status["queued"] = len(queued)
+            if not queued:
+                email_status["status"] = "not_needed"
             else:
+                recipients = email.get("recipients", [])
+                confirmed_urls: list[str] = []
+
+                def confirm_email(chunk: list[Finding]) -> None:
+                    urls = [finding.article.url for finding in chunk]
+                    store.mark_email_sent(urls, detected_at.isoformat())
+                    confirmed_urls.extend(urls)
+
                 try:
-                    send_email(monitor["name"], recipients, findings)
-                except RuntimeError as error:
-                    errors.append(str(error))
+                    if not recipients:
+                        raise RuntimeError("Email recipients are missing.")
+                    send_email(monitor["name"], recipients, queued, on_confirmed=confirm_email)
+                    email_status["status"] = "sent"
+                    email_status["sent"] = len(confirmed_urls)
+                except Exception as error:
+                    message = _delivery_error("Email", error)
+                    remaining_urls = [finding.article.url for finding in queued if finding.article.url not in confirmed_urls]
+                    store.mark_email_failed(remaining_urls, message, detected_at.isoformat())
+                    email_status["status"] = "partial" if confirmed_urls else "failed"
+                    email_status["sent"] = len(confirmed_urls)
+                    email_status["failed"] = len(remaining_urls)
+                    errors.append(message)
 
         sheets = outputs.get("google_sheets", {})
-        if sheets.get("enabled") and findings and not initialize:
+        if sheets.get("enabled") and not initialize and store:
+            sheets_status = delivery_status["google_sheets"]
             if not sheets.get("spreadsheet_id"):
-                errors.append("Google Sheets is enabled but outputs.google_sheets.spreadsheet_id is empty.")
+                sheets_status["status"] = "failed"
+                errors.append("Google Sheets delivery was not confirmed (missing spreadsheet ID).")
             else:
-                try:
-                    append_google_sheet(sheets["spreadsheet_id"], sheets.get("worksheet", "News"), findings)
-                except RuntimeError as error:
-                    errors.append(str(error))
+                spreadsheet_id = sheets["spreadsheet_id"]
+                worksheet = sheets.get("worksheet", "News")
+                queued = store.pending_google_sheets_findings(spreadsheet_id, worksheet)
+                sheets_status["queued"] = len(queued)
+                if not queued:
+                    sheets_status["status"] = "not_needed"
+                else:
+                    confirmed_urls: list[str] = []
+
+                    def confirm_sheets(chunk: list[Finding]) -> None:
+                        urls = [finding.article.url for finding in chunk]
+                        store.mark_google_sheets_sent(
+                            urls, spreadsheet_id, worksheet, detected_at.isoformat()
+                        )
+                        confirmed_urls.extend(urls)
+
+                    try:
+                        append_google_sheet(
+                            spreadsheet_id, worksheet, queued, on_confirmed=confirm_sheets
+                        )
+                        sheets_status["status"] = "sent"
+                        sheets_status["sent"] = len(confirmed_urls)
+                    except Exception as error:
+                        message = _delivery_error("Google Sheets", error)
+                        remaining_urls = [
+                            finding.article.url for finding in queued
+                            if finding.article.url not in confirmed_urls
+                        ]
+                        store.mark_google_sheets_failed(
+                            remaining_urls, spreadsheet_id, worksheet, message, detected_at.isoformat()
+                        )
+                        sheets_status["status"] = "partial" if confirmed_urls else "failed"
+                        sheets_status["sent"] = len(confirmed_urls)
+                        sheets_status["failed"] = len(remaining_urls)
+                        errors.append(message)
 
         status_path = monitor.get("status_path") or str(Path(database_path).with_suffix(".status.json"))
         write_status(
@@ -191,3 +259,8 @@ def run_monitor(
     finally:
         if store:
             store.close()
+
+
+def _delivery_error(channel: str, error: Exception) -> str:
+    """Keep diagnostics useful without copying credentials or server responses into status files."""
+    return f"{channel} delivery was not confirmed ({type(error).__name__})."
