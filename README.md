@@ -8,6 +8,15 @@ Open News Monitor lets a person choose public sources, checks whether they can b
 
 It does not search the entire web, publish content, or replace human judgement.
 
+## Start with Codex or Claude Code
+
+1. Copy this repository URL and open the project in Codex or Claude Code.
+2. Ask: “Help me install and configure Open News Monitor step by step.”
+3. Answer the assistant's short questions about your topic, sources and delivery channel.
+4. Confirm any action involving an external account or a real test delivery.
+
+The assistant can run safe local steps and explain the rest. It must never ask you to paste tokens, passwords or service-account keys into chat.
+
 ## Current capabilities
 
 - Check a public URL before adding it to a profile.
@@ -16,9 +25,12 @@ It does not search the entire web, publish content, or replace human judgement.
 - Save a local SQLite history and avoid delivering the same link twice.
 - Create a safe first-run baseline: current publications are remembered but not delivered.
 - Create Markdown digests and local status reports.
-- Offer optional Telegram, email and Google Sheets settings. These delivery integrations are present in code but have **not** been end-to-end tested in this public project.
+- Deliver through optional Telegram, email (including Gmail SMTP), and Google Sheets queues.
+- Run `doctor` to check local channel readiness without contacting external services.
 
-Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet.
+Telegram, email and Google Sheets have passed controlled real-delivery and no-repeat tests. This reduces the risk of loss and duplicates, but cannot guarantee external delivery in every network-failure scenario.
+
+Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet. A graphical interface and built-in scheduling are not implemented.
 
 ## Windows quick start
 
@@ -39,6 +51,14 @@ Run the monitor and view its status:
 .\.venv\Scripts\python.exe -m open_news_monitor run config\local\my-monitor.json
 .\.venv\Scripts\python.exe -m open_news_monitor status config\local\my-monitor.json
 ```
+
+Before the first ordinary run, check local configuration:
+
+```powershell
+.\.venv\Scripts\python.exe -m open_news_monitor doctor config\local\my-monitor.json
+```
+
+`doctor` sends nothing and makes no network requests. `READY` means the required local settings exist; it does not confirm access to an external service.
 
 If you decline the first-run baseline, run it later without delivery:
 
@@ -69,7 +89,7 @@ Check a URL without creating a profile:
 
 Local automated tests and a full temporary-profile check have verified RSS source checks, profile creation, first-run initialization, SQLite deduplication, status reporting, and partial failure handling. The real-source integration check used public GitHub Blog and Python Insider RSS feeds.
 
-Still in development: a graphical interface, built-in scheduling, automatic analysis of arbitrary HTML pages, and end-to-end verification of Telegram, email and Google Sheets delivery.
+Still in development: a graphical interface, built-in scheduling, and automatic analysis of arbitrary HTML pages.
 
 ## Privacy and safety
 
@@ -79,6 +99,9 @@ Never commit bot tokens, chat IDs, SMTP passwords, Google service-account keys, 
 
 - [Russian README](README.ru.md)
 - [Russian Windows setup guide](docs/SETUP_RU.md)
+- [Telegram, Gmail, and Google Sheets setup](docs/CHANNELS_RU.md)
+- [Instructions for Codex](AGENTS.md)
+- [Instructions for Claude Code](CLAUDE.md)
 - [Project map](КАРТА_ПРОЕКТА.md)
 - [Source research standard](skills/news-source-research/SKILL.md)
 

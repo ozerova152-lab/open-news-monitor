@@ -5,9 +5,11 @@ import sys
 from pathlib import Path
 
 from .config import ConfigurationError, load_config
+from .doctor import render_doctor_report
 from .initializer import create_monitor_interactively
 from .local_env import load_local_env
-from .pipeline import run_monitor
+from .locking import MonitorAlreadyRunningError
+from .pipeline import collect_monitor, deliver_monitor, run_monitor
 from .source_check import check_rss_source
 from .source_probe import probe_source_report
 from .status import read_status, render_status
@@ -35,8 +37,19 @@ def main() -> None:
         action="store_true",
         help="Save the current feed items as a first-run baseline without sending them.",
     )
+    collect = subparsers.add_parser("collect", help="Collect and queue publications without delivery.")
+    collect.add_argument("config", help="Path to a monitor JSON file.")
+    collect.add_argument("--dry-run", action="store_true", help="Fetch and preview without storing or queueing.")
+    deliver = subparsers.add_parser("deliver", help="Deliver queued publications without fetching sources.")
+    deliver.add_argument("config", help="Path to a monitor JSON file.")
+    deliver.add_argument(
+        "--channels",
+        help="Comma-separated channels: telegram,email,google_sheets. Default: all enabled channels.",
+    )
     status = subparsers.add_parser("status", help="Show the health report from the last ordinary run.")
     status.add_argument("config", help="Path to a monitor JSON file.")
+    doctor = subparsers.add_parser("doctor", help="Check local readiness without sending anything.")
+    doctor.add_argument("config", nargs="?", help="Path to a monitor JSON file.")
     args = parser.parse_args()
 
     if args.command == "check-source":
@@ -54,6 +67,11 @@ def main() -> None:
             parser.error(str(error))
         return
 
+    if args.command == "doctor" and not args.config:
+        print("Профиль не указан. Укажите путь, например: open-news-monitor doctor config/local/my-monitor.json")
+        print("Если профиля ещё нет, создайте его через: .\\scripts\\create-monitor.ps1 -Name my-monitor")
+        return
+
     try:
         config = load_config(args.config)
     except ConfigurationError as error:
@@ -69,9 +87,52 @@ def main() -> None:
         print(render_status(read_status(status_path)))
         return
 
+    if args.command == "doctor":
+        print(render_doctor_report(config))
+        return
+
+    if args.command == "collect":
+        try:
+            findings, errors, markdown = collect_monitor(config, dry_run=args.dry_run)
+        except MonitorAlreadyRunningError as error:
+            parser.error(str(error))
+        print(markdown)
+        print(f"Collection completed: {len(findings)} new matching publication(s).")
+        if errors:
+            print("Completed with source errors:", file=sys.stderr)
+            for error in errors:
+                print(f"- {error}", file=sys.stderr)
+        return
+
+    if args.command == "deliver":
+        channels = None
+        if args.channels:
+            channels = {item.strip() for item in args.channels.split(",") if item.strip()}
+            allowed = {"telegram", "email", "google_sheets"}
+            unknown = channels - allowed
+            if unknown:
+                parser.error("Unknown delivery channel: " + ", ".join(sorted(unknown)))
+            if not channels:
+                parser.error("Choose at least one delivery channel.")
+        try:
+            errors, delivery_status = deliver_monitor(config, channels=channels)
+        except MonitorAlreadyRunningError as error:
+            parser.error(str(error))
+        print("Delivery completed.")
+        for channel, result in delivery_status.items():
+            print(f"- {channel}: {result['status']}; confirmed: {result['sent']}; retry: {result['failed']}")
+        if errors:
+            print("Completed with delivery errors:", file=sys.stderr)
+            for error in errors:
+                print(f"- {error}", file=sys.stderr)
+        return
+
     if args.dry_run and args.initialize:
         parser.error("Choose either --dry-run or --initialize, not both.")
-    findings, errors, markdown = run_monitor(config, dry_run=args.dry_run, initialize=args.initialize)
+    try:
+        findings, errors, markdown = run_monitor(config, dry_run=args.dry_run, initialize=args.initialize)
+    except MonitorAlreadyRunningError as error:
+        parser.error(str(error))
     print(markdown)
     print(f"Run completed: {len(findings)} new matching publication(s).")
     if errors:
