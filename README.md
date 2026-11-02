@@ -1,3 +1,5 @@
+![Open News Monitor](assets/cover-news.jpg)
+
 # Open News Monitor
 
 **A self-hosted, source-first news monitoring agent.**
