@@ -5,6 +5,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -63,6 +64,9 @@ class DatabaseLockingTests(unittest.TestCase):
         if process.poll() is None:
             process.terminate()
         process.wait(timeout=5)
+        # Windows can report a terminated process a moment before its locked
+        # file handle is observable as released by TemporaryDirectory.cleanup.
+        time.sleep(0.1)
         if process.stdout:
             process.stdout.close()
         if process.stderr:

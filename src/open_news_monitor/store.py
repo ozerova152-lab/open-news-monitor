@@ -70,6 +70,17 @@ class ArticleStore:
             )
             """
         )
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS schedule_runs (
+                job_key TEXT PRIMARY KEY,
+                action TEXT NOT NULL CHECK (action IN ('collect', 'deliver')),
+                channel TEXT,
+                scheduled_for TEXT NOT NULL,
+                completed_at TEXT NOT NULL
+            )
+            """
+        )
         self.connection.commit()
 
     def has_seen(self, url: str) -> bool:
@@ -293,6 +304,30 @@ class ArticleStore:
             f"SELECT state, COUNT(*) FROM {queue_table} GROUP BY state"
         ).fetchall()
         return {state: count for state, count in rows}
+
+    def schedule_run_completed(self, job_key: str) -> bool:
+        return self.connection.execute(
+            "SELECT 1 FROM schedule_runs WHERE job_key = ?", (job_key,)
+        ).fetchone() is not None
+
+    def mark_schedule_run_completed(
+        self, job_key: str, action: str, channel: str | None, scheduled_for: str, completed_at: str
+    ) -> None:
+        """Persist one successful scheduler action atomically.
+
+        It is called only after collection or delivery returns without errors.
+        If the process stops beforehand, the action is safely retried: article
+        memory and the channel queues prevent duplicate publication delivery.
+        """
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR IGNORE INTO schedule_runs
+                (job_key, action, channel, scheduled_for, completed_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (job_key, action, channel, scheduled_for, completed_at),
+            )
 
     def close(self) -> None:
         self.connection.close()

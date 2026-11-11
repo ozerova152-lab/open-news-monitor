@@ -10,9 +10,18 @@ from .initializer import create_monitor_interactively
 from .local_env import load_local_env
 from .locking import MonitorAlreadyRunningError
 from .pipeline import collect_monitor, deliver_monitor, run_monitor
+from .scheduling import ScheduleConfigurationError, render_schedule_tick_report, schedule_tick
 from .source_check import check_rss_source
 from .source_probe import probe_source_report
 from .status import read_status, render_status
+from .windows_scheduler import (
+    TaskSchedulerError,
+    WindowsTaskScheduler,
+    build_task_spec,
+    confirmation_approved,
+    render_task_preview,
+    render_task_status,
+)
 
 
 def main() -> None:
@@ -46,6 +55,13 @@ def main() -> None:
         "--channels",
         help="Comma-separated channels: telegram,email,google_sheets. Default: all enabled channels.",
     )
+    schedule_tick_parser = subparsers.add_parser("schedule-tick", help="Run only the collection and deliveries due under a profile schedule.")
+    schedule_tick_parser.add_argument("config", help="Path to a monitor JSON file.")
+    schedule = subparsers.add_parser("schedule", help="Safely manage the Windows task for a profile schedule.")
+    schedule_actions = schedule.add_subparsers(dest="schedule_action", required=True)
+    for action in ("install", "status", "disable", "enable", "remove"):
+        action_parser = schedule_actions.add_parser(action)
+        action_parser.add_argument("config", help="Path to a monitor JSON file.")
     status = subparsers.add_parser("status", help="Show the health report from the last ordinary run.")
     status.add_argument("config", help="Path to a monitor JSON file.")
     doctor = subparsers.add_parser("doctor", help="Check local readiness without sending anything.")
@@ -89,6 +105,37 @@ def main() -> None:
 
     if args.command == "doctor":
         print(render_doctor_report(config))
+        return
+
+    if args.command == "schedule-tick":
+        try:
+            print(render_schedule_tick_report(schedule_tick(config)))
+        except (MonitorAlreadyRunningError, ScheduleConfigurationError) as error:
+            parser.error(str(error))
+        return
+
+    if args.command == "schedule":
+        try:
+            spec = build_task_spec(config, args.config)
+            scheduler = WindowsTaskScheduler()
+            if args.schedule_action == "status":
+                print(render_task_status(spec, scheduler.status(spec)))
+                return
+            print(render_task_preview(args.schedule_action, spec))
+            if not confirmation_approved():
+                print("Действие отменено: явное подтверждение не получено.")
+                return
+            if args.schedule_action == "install":
+                scheduler.create(spec)
+            elif args.schedule_action == "enable":
+                scheduler.set_enabled(spec, True)
+            elif args.schedule_action == "disable":
+                scheduler.set_enabled(spec, False)
+            elif args.schedule_action == "remove":
+                scheduler.remove(spec)
+            print("Действие с задачей Планировщика выполнено.")
+        except (TaskSchedulerError, ScheduleConfigurationError) as error:
+            parser.error(str(error))
         return
 
     if args.command == "collect":

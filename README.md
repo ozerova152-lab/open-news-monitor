@@ -27,10 +27,12 @@ The assistant can run safe local steps and explain the rest. It must never ask y
 - Create Markdown digests and local status reports.
 - Deliver through optional Telegram, email (including Gmail SMTP), and Google Sheets queues.
 - Run `doctor` to check local channel readiness without contacting external services.
+- Separate collection from delivery with `collect`, `deliver`, and `run`.
+- Optionally define a profile schedule and run `schedule-tick` from a Windows task.
 
 Telegram, email and Google Sheets have passed controlled real-delivery and no-repeat tests. This reduces the risk of loss and duplicates, but cannot guarantee external delivery in every network-failure scenario.
 
-Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet. A graphical interface and built-in scheduling are not implemented.
+Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet. A graphical interface is not implemented.
 
 ## Windows quick start
 
@@ -68,6 +70,19 @@ If you decline the first-run baseline, run it later without delivery:
 
 Some automated PowerShell input pipelines can corrupt Cyrillic confirmation text. In that case, use the safe equivalent `yes`. In normal interactive use the wizard also accepts `Да` and `д`.
 
+## Optional Windows scheduling
+
+Profiles can include an optional `schedule` section. `schedule-tick` performs only the collection and deliveries due at that moment; it is not a background process. A Windows task can call it after sign-in and then approximately every five minutes.
+
+Before creating a task, run `doctor` and inspect the profile. The task commands always require an explicit confirmation for changes:
+
+```powershell
+.\.venv\Scripts\open-news-monitor.exe schedule install config\local\my-monitor.json
+.\.venv\Scripts\open-news-monitor.exe schedule status config\local\my-monitor.json
+```
+
+Use `schedule disable`, `schedule enable`, or `schedule remove` with the same profile to control only that profile's task. Task creation may still be restricted by local Windows policy; never run it as administrator unless the user has explicitly agreed.
+
 ## Source check results
 
 `probe-source` and the setup wizard use four clear results:
@@ -89,7 +104,7 @@ Check a URL without creating a profile:
 
 Local automated tests and a full temporary-profile check have verified RSS source checks, profile creation, first-run initialization, SQLite deduplication, status reporting, and partial failure handling. The real-source integration check used public GitHub Blog and Python Insider RSS feeds.
 
-Still in development: a graphical interface, built-in scheduling, and automatic analysis of arbitrary HTML pages.
+Still in development: a graphical interface and automatic analysis of arbitrary HTML pages. Windows task creation is locally validated through the Task Scheduler COM API, but must be checked on each user's computer before it is treated as working.
 
 ## Privacy and safety
 

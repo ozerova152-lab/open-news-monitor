@@ -19,6 +19,6 @@ Claude Code is the user's technical guide for this repository. Treat the user as
 - `doctor` must stay local-only: no Telegram, SMTP or Google API calls.
 - `run --initialize` saves a first-run baseline without delivery.
 - `run --dry-run` previews current publications without using SQLite memory; do not use it as a duplicate-delivery check.
-- Do not create a Windows scheduled task: scheduling is not implemented yet.
+- `schedule-tick` and `schedule install/status/enable/disable/remove` are available for Windows automation. Before any task mutation, show the task name, profile, Python path, cadence and stop method, then obtain explicit user approval. Do not promise the task works until one controlled local test succeeds; never alter an unrelated task or elevate privileges without separate approval.
 
-RSS/Atom and some public JSON sources can be connected automatically after real publications are confirmed. Plain HTML pages without an advertised feed still need verified collection rules. There is no graphical interface or built-in scheduling. Delivery queues reduce loss and repeats, but an interrupted external confirmation can still make an external duplicate possible.
+RSS/Atom and some public JSON sources can be connected automatically after real publications are confirmed. Plain HTML pages without an advertised feed still need verified collection rules. There is no graphical interface. Delivery queues reduce loss and repeats, but an interrupted external confirmation can still make an external duplicate possible.

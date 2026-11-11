@@ -9,6 +9,8 @@ from email.utils import parseaddr
 from pathlib import Path
 from typing import Mapping
 
+from .scheduling import schedule_configuration_problem
+
 
 READY = "READY"
 NEEDS_SETUP = "NEEDS_SETUP"
@@ -32,12 +34,17 @@ def inspect_profile(config: dict, *, environment: Mapping[str, str] | None = Non
     """
     env = os.environ if environment is None else environment
     outputs = config.get("outputs", {})
-    return [
+    checks = [
         _check_markdown(outputs.get("markdown", {"enabled": True})),
         _check_telegram(outputs.get("telegram", {}), env),
         _check_email(outputs.get("email", {}), env),
         _check_google_sheets(outputs.get("google_sheets", {}), env),
     ]
+    # Profiles created before scheduling deliberately have no schedule section.
+    # Keep their doctor output unchanged; a present section is always checked.
+    if "schedule" in config:
+        checks.append(_check_schedule(config))
+    return checks
 
 
 def render_doctor_report(config: dict, *, environment: Mapping[str, str] | None = None) -> str:
@@ -49,6 +56,7 @@ def render_doctor_report(config: dict, *, environment: Mapping[str, str] | None 
             "telegram": "Telegram",
             "email": "Email",
             "google_sheets": "Google Sheets",
+            "schedule": "Расписание",
         }[check.channel]
         status = {
             READY: "ГОТОВО",
@@ -163,6 +171,19 @@ def _check_google_sheets(settings: dict, env: Mapping[str, str]) -> DoctorCheck:
     if key_check:
         return DoctorCheck("google_sheets", ERROR, key_check, "Проверьте путь и структуру локального JSON-файла сервисного аккаунта.")
     return DoctorCheck("google_sheets", READY, "Библиотеки, локальный ключ, ID таблицы и название листа присутствуют.")
+
+
+def _check_schedule(config: dict) -> DoctorCheck:
+    settings = config.get("schedule")
+    if settings is None or (isinstance(settings, dict) and settings.get("enabled", False) is False):
+        return DoctorCheck("schedule", DISABLED, "Расписание не включено в этом профиле.")
+    problem = schedule_configuration_problem(config)
+    if problem:
+        return DoctorCheck("schedule", ERROR, problem, "Исправьте раздел schedule в профиле и снова запустите doctor.")
+    return DoctorCheck(
+        "schedule", READY,
+        "Расписание имеет корректный локальный формат. Оно начнёт работать, когда внешняя задача будет запускать schedule-tick.",
+    )
 
 
 def _looks_like_email(value: str) -> bool:
