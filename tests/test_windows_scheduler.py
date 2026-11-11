@@ -206,4 +206,3 @@ class WindowsSchedulerTests(unittest.TestCase):
             spec = self._spec(Path(directory))
             xml = task_xml(spec).replace(spec.user_id, "OTHER\\User")
             self.assertFalse(is_owned_task(xml, spec))
-

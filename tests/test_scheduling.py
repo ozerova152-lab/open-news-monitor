@@ -192,7 +192,6 @@ class SchedulingTests(unittest.TestCase):
                 if outputs:
                     config["outputs"].update(outputs)
                 self.assertIn(expected, schedule_configuration_problem(config))
-
     def test_doctor_reports_schedule_errors_without_network_access(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
