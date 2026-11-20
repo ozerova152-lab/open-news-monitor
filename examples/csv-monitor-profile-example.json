@@ -1,0 +1,37 @@
+{
+  "monitor": {
+    "name": "Example CSV monitor",
+    "database_path": "runtime/example-csv-monitor.sqlite3",
+    "status_path": "runtime/example-csv-monitor.status.json"
+  },
+  "filters": {
+    "include_any": [],
+    "exclude_any": []
+  },
+  "outputs": {
+    "markdown": {
+      "enabled": true,
+      "path": "runtime/example-csv-monitor.md"
+    },
+    "telegram": {
+      "enabled": false
+    },
+    "email": {
+      "enabled": false,
+      "recipients": []
+    },
+    "google_sheets": {
+      "enabled": false,
+      "spreadsheet_id": "",
+      "worksheet": "News"
+    }
+  },
+  "sources_registry": {
+    "path": "sources-registry-example.csv",
+    "encoding": "utf-8-sig",
+    "delimiter": ";"
+  },
+  "schedule": {
+    "enabled": false
+  }
+}

@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install project in a clean environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Run automated tests
+        run: python -m unittest discover -s tests
+
+      - name: Check Python syntax
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+
+          for path in sorted(Path("src").rglob("*.py")):
+              ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+          print("Python syntax is valid.")
+          PY
+
+      - name: Check changed diff whitespace
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git diff --check "$BASE_SHA" "$HEAD_SHA"
+          elif [ -n "$BEFORE_SHA" ] && ! [[ "$BEFORE_SHA" =~ ^0+$ ]]; then
+            git diff --check "$BEFORE_SHA" "$HEAD_SHA"
+          else
+            git diff-tree --no-commit-id --check -r "$HEAD_SHA"
+          fi
+
+      - name: Build wheel
+        run: python -m pip wheel --no-deps . --wheel-dir dist

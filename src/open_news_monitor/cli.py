@@ -13,6 +13,8 @@ from .pipeline import collect_monitor, deliver_monitor, run_monitor
 from .scheduling import ScheduleConfigurationError, render_schedule_tick_report, schedule_tick
 from .source_check import check_rss_source
 from .source_probe import probe_source_report
+from .source_probe import probe_source_url
+from .source_registry import SourceRegistryError, check_configured_html_source, registry_path
 from .status import read_status, render_status
 from .windows_scheduler import (
     TaskSchedulerError,
@@ -61,6 +63,11 @@ def main() -> None:
     schedule_actions = schedule.add_subparsers(dest="schedule_action", required=True)
     for action in ("install", "status", "disable", "enable", "remove"):
         action_parser = schedule_actions.add_parser(action)
+        action_parser.add_argument("config", help="Path to a monitor JSON file.")
+    sources = subparsers.add_parser("sources", help="Validate or check an optional CSV source registry.")
+    sources_actions = sources.add_subparsers(dest="sources_action", required=True)
+    for action in ("validate", "check"):
+        action_parser = sources_actions.add_parser(action)
         action_parser.add_argument("config", help="Path to a monitor JSON file.")
     status = subparsers.add_parser("status", help="Show the health report from the last ordinary run.")
     status.add_argument("config", help="Path to a monitor JSON file.")
@@ -136,6 +143,34 @@ def main() -> None:
             print("Действие с задачей Планировщика выполнено.")
         except (TaskSchedulerError, ScheduleConfigurationError) as error:
             parser.error(str(error))
+        return
+
+    if args.command == "sources":
+        registry = config.get("sources_registry")
+        if registry is None:
+            parser.error("В этом профиле не указан sources_registry. Обычный массив sources продолжает использоваться без CSV.")
+        try:
+            path = registry_path(registry, args.config)
+        except SourceRegistryError as error:
+            parser.error(str(error))
+        enabled = [source for source in config["sources"] if source.get("enabled", True)]
+        disabled = len(config["sources"]) - len(enabled)
+        if args.sources_action == "validate":
+            print(f"CSV-реестр проверен: {path}")
+            print(f"Всего источников: {len(config['sources'])}; включено: {len(enabled)}; отключено: {disabled}.")
+            return
+        print(f"Проверка источников из CSV: {path}")
+        if not enabled:
+            print("Нет включённых источников для проверки.")
+            return
+        for source in enabled:
+            result = (
+                check_configured_html_source(source)
+                if source["kind"] == "html" else probe_source_url(source["url"], source["name"])
+            )
+            print(f"{source['name']}: {result.status.value} — {result.message}")
+            if result.discovered_feed_url:
+                print(f"  Найдена лента: {result.discovered_feed_url}")
         return
 
     if args.command == "collect":

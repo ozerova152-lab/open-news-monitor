@@ -12,6 +12,24 @@ from .models import Finding
 from .store import publication_id_for_url
 
 
+def summary_excerpt(summary: str, max_chars: int) -> str:
+    """Return a factual, whitespace-normalized excerpt without adding content."""
+    text = " ".join(summary.split())
+    if not text or len(text) <= max_chars:
+        return text
+    cutoff = max(text.rfind(mark, 0, max_chars + 1) for mark in ".?!…")
+    if cutoff >= max_chars // 2:
+        return text[:cutoff + 1].rstrip()
+    return text[:max(1, max_chars - 1)].rstrip() + "…"
+
+
+def finding_excerpt(finding: Finding, presentation: dict | None = None) -> str:
+    settings = presentation or {}
+    if settings.get("summary_mode", "none") != "excerpt":
+        return ""
+    return summary_excerpt(finding.article.summary, settings.get("summary_max_chars", 400))
+
+
 def render_markdown(monitor_name: str, findings: list[Finding], errors: list[str]) -> str:
     lines = [f"# {monitor_name}", "", f"New matching publications: **{len(findings)}**", ""]
     if findings:
@@ -49,12 +67,12 @@ def write_markdown(path: str | Path, content: str) -> None:
 TELEGRAM_MESSAGE_LIMIT = 4096
 
 
-def send_telegram(monitor_name: str, findings: list[Finding], *, on_confirmed=None) -> None:
+def send_telegram(monitor_name: str, findings: list[Finding], *, on_confirmed=None, presentation: dict | None = None) -> None:
     token = os.getenv("ONM_TELEGRAM_BOT_TOKEN")
     chat_id = os.getenv("ONM_TELEGRAM_CHAT_ID")
     if not token or not chat_id:
         raise RuntimeError("Telegram is enabled but ONM_TELEGRAM_BOT_TOKEN or ONM_TELEGRAM_CHAT_ID is missing.")
-    for text, chunk in telegram_message_chunks(monitor_name, findings):
+    for text, chunk in telegram_message_chunks(monitor_name, findings, presentation=presentation):
         request = Request(
             f"https://api.telegram.org/bot{token}/sendMessage",
             data=f"chat_id={quote(chat_id)}&text={quote(text)}&disable_web_page_preview=true".encode(),
@@ -69,7 +87,10 @@ def send_telegram(monitor_name: str, findings: list[Finding], *, on_confirmed=No
             on_confirmed(chunk)
 
 
-def send_email(monitor_name: str, recipients: list[str], findings: list[Finding], *, on_confirmed=None) -> None:
+def send_email(
+    monitor_name: str, recipients: list[str], findings: list[Finding], *, on_confirmed=None,
+    presentation: dict | None = None,
+) -> None:
     required = {key: os.getenv(key) for key in ("ONM_SMTP_HOST", "ONM_SMTP_USERNAME", "ONM_SMTP_PASSWORD", "ONM_SMTP_FROM")}
     missing = [key for key, value in required.items() if not value]
     if missing:
@@ -79,7 +100,7 @@ def send_email(monitor_name: str, recipients: list[str], findings: list[Finding]
     message["Subject"] = f"{monitor_name}: {len(findings)} new matching publication(s)"
     message["From"] = required["ONM_SMTP_FROM"]
     message["To"] = ", ".join(recipients)
-    message.set_content(_plain_digest(monitor_name, findings, limit=None))
+    message.set_content(_plain_digest(monitor_name, findings, limit=None, presentation=presentation))
     port = int(os.getenv("ONM_SMTP_PORT", "587"))
     with smtplib.SMTP(required["ONM_SMTP_HOST"], port, timeout=20) as server:
         server.starttls()
@@ -148,19 +169,27 @@ def _google_service():
     return build("sheets", "v4", credentials=credentials, cache_discovery=False)
 
 
-def _plain_digest(monitor_name: str, findings: list[Finding], *, limit: int | None = 10) -> str:
+def _plain_digest(
+    monitor_name: str, findings: list[Finding], *, limit: int | None = 10,
+    presentation: dict | None = None,
+) -> str:
     lines = [f"{monitor_name}: {len(findings)} new matching publication(s)"]
     selected = findings if limit is None else findings[:limit]
     for finding in selected:
         article = finding.article
-        lines.extend(["", article.title, f"{article.source_name} | {article.url}"])
+        lines.extend(["", article.title])
+        excerpt = finding_excerpt(finding, presentation)
+        if excerpt:
+            lines.append(excerpt)
+        lines.append(f"{article.source_name} | {article.url}")
     if limit is not None and len(findings) > limit:
         lines.append(f"\nAnd {len(findings) - limit} more item(s) in the full digest.")
     return "\n".join(lines)
 
 
 def telegram_message_chunks(
-    monitor_name: str, findings: list[Finding], *, max_chars: int = TELEGRAM_MESSAGE_LIMIT
+    monitor_name: str, findings: list[Finding], *, max_chars: int = TELEGRAM_MESSAGE_LIMIT,
+    presentation: dict | None = None,
 ) -> list[tuple[str, list[Finding]]]:
     """Split a Telegram digest without splitting or silently dropping publications."""
     if max_chars < 64:
@@ -171,10 +200,8 @@ def telegram_message_chunks(
     current_findings: list[Finding] = []
 
     for finding in findings:
-        entry = _telegram_entry(finding)
         available = max_chars - len(header) - 2
-        if len(entry) > available:
-            entry = _shorten_telegram_entry(finding, available)
+        entry = _telegram_entry(finding, finding_excerpt(finding, presentation), available)
         candidate = "\n".join([*current_lines, "", entry])
         if len(candidate) <= max_chars:
             current_lines.extend(["", entry])
@@ -192,9 +219,21 @@ def telegram_message_chunks(
     return chunks
 
 
-def _telegram_entry(finding: Finding) -> str:
+def _telegram_entry(finding: Finding, excerpt: str, available: int) -> str:
     article = finding.article
-    return f"{article.title}\n{article.source_name} | {article.url}"
+    fixed = f"{article.source_name} | {article.url}"
+    title = article.title
+    if excerpt:
+        summary_space = available - len(title) - len(fixed) - 2
+        if summary_space > 0:
+            excerpt = summary_excerpt(excerpt, summary_space)
+            candidate = f"{title}\n{excerpt}\n{fixed}"
+            if len(candidate) <= available:
+                return candidate
+    candidate = f"{title}\n{fixed}"
+    if len(candidate) <= available:
+        return candidate
+    return _shorten_telegram_entry(finding, available)
 
 
 def _shorten_telegram_entry(finding: Finding, available: int) -> str:

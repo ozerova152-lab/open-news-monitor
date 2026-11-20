@@ -26,7 +26,11 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e .
 ```
 
-## 2. Создание профиля
+## 2. Настройка источников: мастер или CSV
+
+### Вариант A: интерактивный мастер
+
+Подходит, когда источников немного и их удобно добавлять по одному с проверкой:
 
 ```powershell
 .\scripts\create-monitor.ps1 -Name my-monitor
@@ -35,6 +39,18 @@ py -3 -m venv .venv
 Профиль будет создан в `config/local/my-monitor.json`, который не попадает в Git. Мастер по очереди попросит название, URL и название источника, подтверждение подключения, правила отбора и способ доставки. Для первого безопасного запуска оставьте выбор доставки пустым: тогда агент создаст только локальную Markdown-подборку и SQLite-память.
 
 Если вы открыли проект в Codex или Claude Code, достаточно попросить помощника провести эту настройку пошагово. Он должен объяснять один шаг за раз и ждать вашего ответа там, где нужны источники, внешние аккаунты или реальная тестовая отправка.
+
+### Вариант B: CSV-реестр для Excel
+
+Подходит, когда источников много, их нужно группировать или редактировать таблицей. Скопируйте в `config\local\` оба примера: [csv-monitor-profile-example.json](../examples/csv-monitor-profile-example.json) и [sources-registry-example.csv](../examples/sources-registry-example.csv). Все демонстрационные источники выключены.
+
+Затем проверьте CSV без сетевых запросов:
+
+```powershell
+.\.venv\Scripts\open-news-monitor.exe sources validate config\local\csv-monitor-profile-example.json
+```
+
+Подробная структура таблицы: [SOURCES_CSV_RU.md](SOURCES_CSV_RU.md).
 
 ### Что означает проверка источника
 

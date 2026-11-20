@@ -29,6 +29,7 @@ The assistant can run safe local steps and explain the rest. It must never ask y
 - Run `doctor` to check local channel readiness without contacting external services.
 - Separate collection from delivery with `collect`, `deliver`, and `run`.
 - Optionally define a profile schedule and run `schedule-tick` from a Windows task.
+- Optionally manage sources in an Excel-friendly CSV registry.
 
 Telegram, email and Google Sheets have passed controlled real-delivery and no-repeat tests. This reduces the risk of loss and duplicates, but cannot guarantee external delivery in every network-failure scenario.
 
@@ -44,6 +45,8 @@ Requirements: Python 3.11 or newer. Open PowerShell in the repository folder:
 ```
 
 The wizard asks for source URLs one at a time, shows the check result, and asks for explicit confirmation before adding a source. Leave the delivery-choice field empty to keep the first run local: Markdown and SQLite only.
+
+For a larger editable source list, use the [CSV registry guide (Russian)](docs/SOURCES_CSV_RU.md) and the safe [CSV profile example](examples/csv-monitor-profile-example.json). The interactive wizard is best for a few sources; the CSV registry is best for a maintained Excel list.
 
 After the profile is created, the wizard offers to remember current publications as a safe starting point. Choose `Да` (or `yes`) to prevent existing feed entries from being delivered later. The profile is saved in `config/local/`, which Git ignores.
 
@@ -61,6 +64,19 @@ Before the first ordinary run, check local configuration:
 ```
 
 `doctor` sends nothing and makes no network requests. `READY` means the required local settings exist; it does not confirm access to an external service.
+
+## Short descriptions in Telegram and email
+
+Older profiles keep showing only the title, source and link. To include a short excerpt of the publication's existing description in Telegram and email, add this optional section:
+
+```json
+"presentation": {
+  "summary_mode": "excerpt",
+  "summary_max_chars": 400
+}
+```
+
+`excerpt` normalizes and shortens the source description without AI, translation, or added facts. Set `summary_mode` to `none` to hide excerpts.
 
 If you decline the first-run baseline, run it later without delivery:
 
@@ -114,7 +130,10 @@ Never commit bot tokens, chat IDs, SMTP passwords, Google service-account keys, 
 
 - [Russian README](README.ru.md)
 - [Russian Windows setup guide](docs/SETUP_RU.md)
+- [Linux and macOS first-run guide (Russian)](docs/SETUP_UNIX_RU.md)
+- [Automatic scheduling guide (Russian)](docs/SCHEDULING_RU.md)
 - [Telegram, Gmail, and Google Sheets setup](docs/CHANNELS_RU.md)
+- [CSV source registry guide (Russian)](docs/SOURCES_CSV_RU.md)
 - [Instructions for Codex](AGENTS.md)
 - [Instructions for Claude Code](CLAUDE.md)
 - [Project map](КАРТА_ПРОЕКТА.md)

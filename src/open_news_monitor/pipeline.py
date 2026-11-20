@@ -256,6 +256,8 @@ def _deliver_queued(
         delivery_status[channel]["status"] = "not_selected"
 
     telegram = outputs.get("telegram", {})
+    presentation = config.get("presentation")
+    presentation_args = {"presentation": presentation} if presentation is not None else {}
     if "telegram" in selected and telegram.get("enabled"):
         queued = store.pending_telegram_findings()
         channel_status = delivery_status["telegram"]
@@ -269,7 +271,7 @@ def _deliver_queued(
                 store.mark_telegram_sent(urls, detected_at.isoformat())
                 confirmed_urls.extend(urls)
             try:
-                send_telegram(config["monitor"]["name"], queued, on_confirmed=confirm)
+                send_telegram(config["monitor"]["name"], queued, on_confirmed=confirm, **presentation_args)
                 channel_status["status"] = "sent"
                 channel_status["sent"] = len(confirmed_urls)
             except Exception as error:
@@ -298,7 +300,10 @@ def _deliver_queued(
                 recipients = email.get("recipients", [])
                 if not recipients:
                     raise RuntimeError("Email recipients are missing.")
-                send_email(config["monitor"]["name"], recipients, queued, on_confirmed=confirm_email)
+                send_email(
+                    config["monitor"]["name"], recipients, queued,
+                    on_confirmed=confirm_email, **presentation_args,
+                )
                 channel_status["status"] = "sent"
                 channel_status["sent"] = len(confirmed_urls)
             except Exception as error:

@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .models import Source
+from .source_registry import SourceRegistryError, load_sources_registry
 
 
 class ConfigurationError(ValueError):
@@ -21,6 +22,11 @@ def load_config(path: str | Path) -> dict:
 
     if not isinstance(config, dict):
         raise ConfigurationError("The configuration root must be a JSON object.")
+    if "sources_registry" in config:
+        try:
+            config["sources"] = load_sources_registry(config["sources_registry"], config_path)
+        except SourceRegistryError as error:
+            raise ConfigurationError(str(error)) from error
     validate_config(config)
     return config
 
@@ -69,6 +75,16 @@ def validate_config(config: dict) -> None:
     outputs = config.get("outputs", {})
     if not isinstance(outputs, dict):
         raise ConfigurationError("outputs must be an object.")
+
+    presentation = config.get("presentation", {})
+    if not isinstance(presentation, dict):
+        raise ConfigurationError("presentation must be an object.")
+    mode = presentation.get("summary_mode", "none")
+    if mode not in {"none", "excerpt"}:
+        raise ConfigurationError("presentation.summary_mode must be 'none' or 'excerpt'.")
+    max_chars = presentation.get("summary_max_chars", 400)
+    if isinstance(max_chars, bool) or not isinstance(max_chars, int) or not 1 <= max_chars <= 4000:
+        raise ConfigurationError("presentation.summary_max_chars must be an integer from 1 to 4000.")
 
 
 def enabled_sources(config: dict) -> list[Source]:
