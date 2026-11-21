@@ -172,6 +172,7 @@ class SourceRegistryTests(unittest.TestCase):
                 title_confirmed=True, date_confirmed=True, link_confirmed=True, publication_count=1,
             )
             with patch.object(sys, "argv", ["open-news-monitor", "sources", "check", str(profile)]), \
+                 redirect_stdout(io.StringIO()), \
                  patch("open_news_monitor.cli.check_configured_html_source", return_value=inspection) as html_check, \
                  patch("open_news_monitor.cli.probe_source_url") as generic_probe:
                 main()
