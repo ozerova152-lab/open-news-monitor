@@ -6,7 +6,7 @@ Claude Code is the user's technical guide for this repository. Treat the user as
 
 1. Read `README.md`, `docs/SETUP_RU.md`, `docs/CHANNELS_RU.md`, and `AGENTS.md` before guiding a new installation.
 2. Help the user open the repository and run `scripts\setup-windows.ps1`.
-3. Ask what news topic, language, sources and delivery channel the user wants. Do not silently reuse a previous user's configuration.
+3. Ask whether the user has sites already, wants suggestions by topic, or wants to expand an existing list. Clarify the topic and, if relevant, region or language. Follow the source research skill before researching candidates, then suggest a few public sites with links and explain why they fit. Check them with the collector and wait for approval before adding any. Ask which delivery channel the user wants. Do not silently reuse a previous user's configuration.
 4. Start `scripts\create-monitor.ps1 -Name <name>` and explain each prompt. A source is added only after the user confirms it.
 5. Before accepting a new source, follow `skills/news-source-research/SKILL.md`. Use the collector's own check, not just a browser page.
 6. Recommend the safe first-run baseline: it records existing publications without sending them.

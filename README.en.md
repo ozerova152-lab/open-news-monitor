@@ -4,25 +4,29 @@
 
 # Open News Monitor
 
+[Open the project showcase](https://ozerova152-lab.github.io/open-news-monitor/en.html)
+
 Open News Monitor helps you follow publications from public websites and news feeds you choose. You select sources and optional filter words; the program remembers previously seen items and gathers new publications with links to their originals.
 
 It does not search the entire internet, publish news on your behalf, or make editorial decisions. You decide how to use what it finds.
 
-## Install with one phrase
+## Get started with one message
 
-Open Codex or Claude Code with access to your computer and send it the message below. The assistant can guide you one step at a time; answer its questions and confirm your choice of sources and delivery channels.
+1. Open Codex or Claude Code with access to your computer.
+2. Copy the message below and send it to the assistant.
+3. Answer its questions one at a time. It will help you download the project, check which software you need and set up your first news digest.
 
 ```text
 Help me install and set up Open News Monitor.
 Repository: https://github.com/ozerova152-lab/open-news-monitor
 I may not know terminal commands or technical terms. Explain one step at a time in plain language.
 Help me download the project to a folder I choose, then read AGENTS.md and follow its instructions.
-First help me choose and check my sources. Do not add a source without my confirmation.
+Ask whether I have sites already or want suggestions based on a topic. If I need suggestions, give me a few links and explain why they fit. Check which sites can be connected. Do not add a source without my confirmation.
 Offer a safe first initialization that does not send old publications.
 Do not ask me to paste tokens or passwords into chat; wait for my permission before real delivery or setting up a schedule.
 ```
 
-The assistant needs access to your files and terminal. You can also install and use the program yourself by following the steps below; an AI assistant is not required to run it.
+Start with a digest saved on your computer. You can set up Telegram, email or Google Sheets later.
 
 ## What you get
 
@@ -33,7 +37,43 @@ The assistant needs access to your files and terminal. You can also install and 
 
 The program collects news when run. Automatic operation requires a separately configured and tested scheduler.
 
-## What you need
+## Your sources
+
+The wizard checks RSS/Atom feeds and some public JSON sources. It can sometimes discover a feed advertised by a web page. Check results mean:
+
+| Result | Meaning |
+| --- | --- |
+| `READY` | Publications with title, date and direct link were confirmed; you can approve adding the source. |
+| `NEEDS_SETUP` | Further setup is needed for safe collection. |
+| `UNSUPPORTED` | The detected format is not supported by the current collector. |
+| `ERROR` | A technical problem prevented the check from completing. |
+
+HTML pages without a discovered feed are not connected automatically: they need separately verified rules. For larger lists there is a [CSV registry guide](docs/SOURCES_CSV_RU.md) (in Russian): UTF-8 with BOM and `;` as the separator. The guide covers Excel 2010 save limitations.
+
+To add a source to an existing monitor, check it separately with `probe-source`. Once confirmed, add it to the profile's source list or its CSV registry. Avoid running the wizard over an existing profile because it writes a new profile file.
+
+## Delivery channels
+
+All channels are optional. Choose them in the wizard or configure them with your assistant. Enter secrets locally, not in chat.
+
+- **Telegram:** a bot, its token and an agreed test chat ID.
+- **Email:** SMTP settings, sender details and a test recipient; Gmail is supported through SMTP with an app password.
+- **Google Sheets:** a spreadsheet and worksheet, an enabled Google Sheets API, a service account with access to the spreadsheet, and a local JSON key. Install the optional package only after choosing this channel.
+
+Run `doctor` after setup. Separately approve the first real delivery to the chosen test chat, address or spreadsheet. See the [channel setup guide](docs/CHANNELS_RU.md) (in Russian). Telegram and Gmail passed controlled real tests; Google Sheets passed a real test previously, but current access has not been freshly confirmed.
+
+## Automatic scheduling
+
+Without a scheduler, the program runs when you start it. Optional `schedule-tick` performs actions due under the profile; an external task invokes it regularly. On Windows, commands can install, inspect, enable, disable and remove the profile's task. Task changes require explicit consent.
+
+On the tested computer, Windows denied task registration. Do not rely on a schedule until it has passed a controlled check on your own computer. Linux/macOS options also need real-system verification. Setup and stopping instructions: [scheduling guide](docs/SCHEDULING_RU.md) (in Russian).
+
+## Manual installation
+
+<details>
+<summary>Show Windows requirements and commands</summary>
+
+### What you need
 
 - A Windows computer and Python 3.11 or newer; the Windows scripts need the Python launcher `py`.
 - Internet access for installation and checking public sources. Git is needed for the download command below; alternatively download the repository as a ZIP archive.
@@ -42,7 +82,7 @@ The program collects news when run. Automatic operation requires a separately co
 
 The Windows setup has been checked. [Linux and macOS instructions](docs/SETUP_UNIX_RU.md) are available in Russian, but installation and scheduling have not been separately checked on real systems.
 
-## Quick start on Windows
+### Quick start on Windows
 
 A **terminal** is a window where you enter commands. Open PowerShell, paste commands one at a time and press Enter. If the project is already downloaded, start at step 2.
 
@@ -97,36 +137,7 @@ After setup and any approved tests of external channels, run collection and chec
 
 An ordinary `run` can send new publications to every enabled channel. The profile is stored in `config/local/`; results and memory are stored in `runtime/`.
 
-## Your sources
-
-The wizard checks RSS/Atom feeds and some public JSON sources. It can sometimes discover a feed advertised by a web page. Check results mean:
-
-| Result | Meaning |
-| --- | --- |
-| `READY` | Publications with title, date and direct link were confirmed; you can approve adding the source. |
-| `NEEDS_SETUP` | Further setup is needed for safe collection. |
-| `UNSUPPORTED` | The detected format is not supported by the current collector. |
-| `ERROR` | A technical problem prevented the check from completing. |
-
-HTML pages without a discovered feed are not connected automatically: they need separately verified rules. For larger lists there is a [CSV registry guide](docs/SOURCES_CSV_RU.md) (in Russian): UTF-8 with BOM and `;` as the separator. The guide covers Excel 2010 save limitations.
-
-To add a source to an existing monitor, check it separately with `probe-source`. Once confirmed, add it to the profile's source list or its CSV registry. Avoid running the wizard over an existing profile because it writes a new profile file.
-
-## Delivery channels
-
-All channels are optional. Choose them in the wizard or configure them with your assistant. Enter secrets locally, not in chat.
-
-- **Telegram:** a bot, its token and an agreed test chat ID.
-- **Email:** SMTP settings, sender details and a test recipient; Gmail is supported through SMTP with an app password.
-- **Google Sheets:** a spreadsheet and worksheet, an enabled Google Sheets API, a service account with access to the spreadsheet, and a local JSON key. Install the optional package only after choosing this channel.
-
-Run `doctor` after setup. Separately approve the first real delivery to the chosen test chat, address or spreadsheet. See the [channel setup guide](docs/CHANNELS_RU.md) (in Russian). Telegram and Gmail passed controlled real tests; Google Sheets passed a real test previously, but current access has not been freshly confirmed.
-
-## Automatic scheduling
-
-Without a scheduler, the program runs when you start it. Optional `schedule-tick` performs actions due under the profile; an external task invokes it regularly. On Windows, commands can install, inspect, enable, disable and remove the profile's task. Task changes require explicit consent.
-
-On the tested computer, Windows denied task registration. Do not rely on a schedule until it has passed a controlled check on your own computer. Linux/macOS options also need real-system verification. Setup and stopping instructions: [scheduling guide](docs/SCHEDULING_RU.md) (in Russian).
+</details>
 
 ## If something went wrong
 
