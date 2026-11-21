@@ -31,7 +31,7 @@ The assistant can run safe local steps and explain the rest. It must never ask y
 - Optionally define a profile schedule and run `schedule-tick` from a Windows task.
 - Optionally manage sources in an Excel-friendly CSV registry.
 
-Telegram, email and Google Sheets have passed controlled real-delivery and no-repeat tests. This reduces the risk of loss and duplicates, but cannot guarantee external delivery in every network-failure scenario.
+Telegram and Gmail have passed controlled real-delivery checks. Google Sheets passed a real delivery and no-repeat check previously; current Google access has not been freshly confirmed. Local Markdown output has been checked. GitHub Actions passed on Windows (Python 3.11–3.13) and Ubuntu (Python 3.11–3.12). External delivery cannot be guaranteed in every network-failure scenario.
 
 Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet. A graphical interface is not implemented.
 
@@ -47,6 +47,8 @@ Requirements: Python 3.11 or newer. Open PowerShell in the repository folder:
 The wizard asks for source URLs one at a time, shows the check result, and asks for explicit confirmation before adding a source. Leave the delivery-choice field empty to keep the first run local: Markdown and SQLite only.
 
 For a larger editable source list, use the [CSV registry guide (Russian)](docs/SOURCES_CSV_RU.md) and the safe [CSV profile example](examples/csv-monitor-profile-example.json). The interactive wizard is best for a few sources; the CSV registry is best for a maintained Excel list.
+
+For an optional delivery channel, follow the [channel setup guide](docs/CHANNELS_RU.md), run `doctor`, and separately approve the first real test delivery. You can start with local Markdown output.
 
 After the profile is created, the wizard offers to remember current publications as a safe starting point. Choose `Да` (or `yes`) to prevent existing feed entries from being delivered later. The profile is saved in `config/local/`, which Git ignores.
 
@@ -98,6 +100,8 @@ Before creating a task, run `doctor` and inspect the profile. The task commands 
 ```
 
 Use `schedule disable`, `schedule enable`, or `schedule remove` with the same profile to control only that profile's task. Task creation may still be restricted by local Windows policy; never run it as administrator unless the user has explicitly agreed.
+
+Registration was denied on the tested Windows computer, so automatic execution there has not been confirmed. Verify scheduling on the target computer before relying on it. Linux/macOS setup and scheduler instructions have not been separately checked on real systems.
 
 ## Source check results
 

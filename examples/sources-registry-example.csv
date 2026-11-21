@@ -1,4 +1,4 @@
-id;enabled;group;name;url;kind;item_or_card;title;link;date;summary;notes
+﻿id;enabled;group;name;url;kind;item_or_card;title;link;date;summary;notes
 example-rss;FALSE;Примеры;Пример RSS;https://example.org/news.rss;rss;;;;;;Демонстрационный адрес: не включайте без проверки
 example-atom;FALSE;Примеры;Пример Atom;https://example.org/atom.xml;atom;;;;;;Демонстрационный адрес: не включайте без проверки
 example-html;FALSE;Примеры;Пример HTML;https://example.org/news;html;article;h2;a;time;.summary;Демонстрационные правила: требуют реальной проверки
