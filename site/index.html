@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Локальный мониторинг новостей по вашим источникам.">
+<title>Новостник · Мониторинг новостей</title>
+<link rel="stylesheet" href="theme.css">
+<script src="site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">К содержанию</a>
+<header class="bar"><a class="brand" href="index.html">OPEN NEWS MONITOR</a><nav aria-label="Язык"><a lang="ru" href="index.html" aria-current="page">RU</a><a lang="en" href="en.html">EN</a></nav></header>
+<main id="main">
+<section class="hero">
+<div><p class="eyebrow">Открытый код · Локальная установка</p>
+<h1>Новостник</h1><p class="lead">Следите за выбранными сайтами и получайте новые публикации со ссылками на оригиналы.</p>
+<div class="actions"><a class="button" href="https://github.com/ozerova152-lab/open-news-monitor">GitHub</a><a href="#install">Как установить</a></div></div>
+<img src="assets/cover-news.jpg" alt="" fetchpriority="high">
+</section>
+<div class="content">
+<section id="purpose"><h2>Что делает Новостник</h2><p>Собирает новые материалы из выбранных публичных источников, применяет ваши фильтры и сохраняет ссылки на оригиналы.</p></section>
+<section id="audience"><h2>Кому пригодится</h2><ul>
+<li><strong>SMM-специалистам и администраторам новостных каналов</strong> — отслеживать инфоповоды и собирать ссылки на первоисточники для своих публикаций.</li>
+<li><strong>Авторам дайджестов и небольшим редакциям</strong> — следить за своими темами и собирать материалы для подборок.</li>
+<li><strong>Всем, кто регулярно проверяет несколько сайтов</strong> — получать новые публикации из выбранных источников в одной подборке.</li>
+</ul></section>
+<section id="flow"><h2>Как работает</h2><ol class="tiles"><li>Выбираете источники</li><li>Проверяете публикации</li><li>SQLite запоминает известные ссылки</li><li>Программа готовит подборку</li><li>Включённые каналы получают результат</li></ol></section>
+<section id="sources"><h2>Источники</h2><p>RSS, Atom и некоторые общедоступные JSON-источники можно подключить после проверки. Для HTML без найденной ленты нужны отдельно проверенные правила. Список можно вести в CSV с UTF-8 BOM и разделителем «;».</p></section>
+<section id="delivery"><h2>Каналы доставки</h2><ul class="tiles"><li>Markdown — подборка на компьютере</li><li>Telegram — сообщения через вашего бота</li><li>Email — письмо через SMTP, включая Gmail</li><li>Google Sheets — строки в вашей таблице</li></ul></section>
+<section id="install"><h2>Установка одной фразой</h2><p>Вставьте текст в Codex или Claude Code с доступом к компьютеру. Для ручной установки понадобится Python 3.11 или новее.</p>
+<pre id="prompt">Помоги установить и настроить Open News Monitor.
+https://github.com/ozerova152-lab/open-news-monitor
+Скачай проект в согласованную папку, прочитай AGENTS.md и объясняй по одному шагу. Проверяй источники и спрашивай моё согласие перед добавлением. Предложи безопасную инициализацию. Секреты оставляй локально. Перед тестовой отправкой и настройкой расписания дождись моего разрешения.</pre><button type="button" data-copy hidden>Скопировать промпт</button><span role="status" data-status data-ok="Текст скопирован" data-error="Выделите текст и скопируйте вручную"></span></section>
+<section id="demo"><h2>Пример подборки</h2><article class="digest"><p class="eyebrow">Демо · Вымышленная публикация</p><h3>Городская библиотека открыла читальный зал</h3><p>Источник: Городской вестник · 21 ноября 2026</p><p>Зал рассчитан на самостоятельную работу и встречи книжных клубов.</p><a href="https://example.org/">Условная ссылка на первоисточник</a></article></section>
+<section id="schedule"><h2>Расписание</h2><p>При ручном запуске планировщик не нужен. Для автоматизации внешний планировщик вызывает schedule-tick. На тестовом ПК Windows отказала в регистрации задачи. Установка и расписание на Linux/macOS пока не проверены на реальных системах.</p></section>
+<section id="faq"><h2>FAQ</h2>
+<details><summary>Можно запустить мониторинг на этой странице?</summary><p>Это витрина. Программа устанавливается на ваш компьютер и работает через терминал.</p></details>
+<details><summary>Как избежать рассылки старых новостей?</summary><p>Начните с безопасной инициализации. Она запоминает текущие публикации без отправки.</p></details>
+<details><summary>Описания переводятся?</summary><p>Telegram и email могут показывать сокращённое исходное описание. Встроенного AI-перевода нет.</p></details>
+<details><summary>Что проверено?</summary><p>Telegram и Gmail прошли реальные тестовые отправки. Google Sheets ранее прошёл реальную проверку, текущий доступ не перепроверялся. Excel 2010 импортировал CSV, сохранение CSV UTF-8 не подтверждено.</p></details>
+</section></div></main>
+<footer><strong>Open News Monitor</strong><nav aria-label="Документация"><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/README.md">Инструкция</a><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/docs/CHANNELS_RU.md">Каналы</a><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/docs/SCHEDULING_RU.md">Расписание</a><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/LICENSE">MIT</a><a href="https://github.com/ozerova152-lab/open-news-monitor">GitHub</a></nav></footer>
+</body>
+</html>

@@ -1,0 +1,30 @@
+*{box-sizing:border-box}
+:root{color-scheme:light;--ink:#172c27;--muted:#485e56;--paper:#f5f8f3;--line:#cbd9ce;--green:#175846;--mint:#e0eee4}
+body{margin:0;background:var(--paper);color:var(--ink);font:1rem/1.65 system-ui,sans-serif}
+a{color:var(--green);text-underline-offset:.22em}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #a05216;outline-offset:4px}
+.skip{position:absolute;top:0;left:1rem;background:white;padding:.5rem;transform:translateY(-110%)}
+.skip:focus{transform:none}
+.bar,footer{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;padding:1rem max(1rem,calc((100% - 72rem)/2));border-bottom:1px solid var(--line)}
+nav,.actions{display:flex;align-items:center;gap:1rem;flex-wrap:wrap}
+.brand,.eyebrow{font-size:.875rem;letter-spacing:.09em;font-weight:750}
+nav [aria-current]{font-weight:800;text-decoration-thickness:.18em}
+.hero{display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:clamp(1.5rem,5vw,5rem);max-width:74rem;padding:clamp(2rem,8vw,7rem) 1rem;margin:auto}
+.hero img{display:block;width:100%;height:auto;border-radius:1rem;border:1px solid var(--line)}
+h1,h2,h3{line-height:1.13;text-wrap:balance}
+h1{font-size:clamp(2.65rem,6vw,5rem);letter-spacing:-.055em;margin:.4rem 0}
+h2{font-size:clamp(1.65rem,3.3vw,2.5rem);margin:0 0 1rem}
+.lead{font-size:clamp(1.15rem,2vw,1.45rem);color:var(--muted)}
+.button,button{display:inline-block;padding:.65rem 1rem;border:0;border-radius:.45rem;background:var(--green);color:white;font:inherit;font-weight:650;text-decoration:none;cursor:pointer}
+[hidden]{display:none}
+.content{max-width:60rem;margin:auto;padding:0 1rem 3rem}
+.content section{padding:clamp(1.5rem,4vw,3rem) 0;border-top:1px solid var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:.75rem;padding:0;list-style-position:inside}
+ul.tiles{list-style:none}
+.tiles li,.digest{padding:1rem;border:1px solid var(--line);border-radius:.6rem;background:var(--mint)}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:1rem;background:#203d34;color:#f3faf5;border-radius:.6rem;font-size:1rem}
+[data-status]{display:inline-block;margin:.5rem}
+details{padding:.85rem 0;border-bottom:1px solid var(--line)}
+summary{font-weight:650;cursor:pointer}
+footer{border-top:1px solid var(--line);border-bottom:0}
+@media(max-width:45rem){.hero{grid-template-columns:1fr}.hero img{max-width:36rem}}

@@ -4,7 +4,7 @@ Claude Code is the user's technical guide for this repository. Treat the user as
 
 ## Safe onboarding flow
 
-1. Read `README.ru.md`, `docs/SETUP_RU.md`, `docs/CHANNELS_RU.md`, and `AGENTS.md` before guiding a new installation.
+1. Read `README.md`, `docs/SETUP_RU.md`, `docs/CHANNELS_RU.md`, and `AGENTS.md` before guiding a new installation.
 2. Help the user open the repository and run `scripts\setup-windows.ps1`.
 3. Ask what news topic, language, sources and delivery channel the user wants. Do not silently reuse a previous user's configuration.
 4. Start `scripts\create-monitor.ps1 -Name <name>` and explain each prompt. A source is added only after the user confirms it.

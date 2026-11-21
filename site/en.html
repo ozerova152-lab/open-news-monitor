@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Local news monitoring from sources you choose.">
+<title>Open News Monitor · News monitoring</title>
+<link rel="stylesheet" href="theme.css">
+<script src="site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="bar"><a class="brand" href="en.html">OPEN NEWS MONITOR</a><nav aria-label="Language"><a lang="ru" href="index.html">RU</a><a lang="en" href="en.html" aria-current="page">EN</a></nav></header>
+<main id="main">
+<section class="hero">
+<div><p class="eyebrow">Open source · Runs locally</p>
+<h1>Open News Monitor</h1><p class="lead">Follow the sites you choose and get new publications with links to the originals.</p>
+<div class="actions"><a class="button" href="https://github.com/ozerova152-lab/open-news-monitor">GitHub</a><a href="#install">How to install</a></div></div>
+<img src="assets/cover-news.jpg" alt="" fetchpriority="high">
+</section>
+<div class="content">
+<section id="purpose"><h2>What it does</h2><p>Collects new items from selected public sources, applies your filters and keeps the original links.</p></section>
+<section id="audience"><h2>Who it helps</h2><ul>
+<li><strong>Social media managers and news channel admins</strong> can track developments worth covering and gather links to original sources for their posts.</li>
+<li><strong>Newsletter writers and small editorial teams</strong> can follow their topics and find material for roundups.</li>
+<li><strong>Anyone who regularly checks several websites</strong> can get new items from selected sources in one digest.</li>
+</ul></section>
+<section id="flow"><h2>How it works</h2><ol class="tiles"><li>Choose sources</li><li>Verify publications</li><li>SQLite remembers known links</li><li>The program builds a digest</li><li>Enabled channels receive it</li></ol></section>
+<section id="sources"><h2>Sources</h2><p>RSS, Atom and some public JSON sources can be connected after verification. HTML pages without a discovered feed require verified collection rules. Manage larger lists in a UTF-8 BOM CSV with a semicolon separator.</p></section>
+<section id="delivery"><h2>Delivery channels</h2><ul class="tiles"><li>Markdown — a digest on your computer</li><li>Telegram — messages through your bot</li><li>Email — a digest via SMTP, including Gmail</li><li>Google Sheets — rows in your spreadsheet</li></ul></section>
+<section id="install"><h2>Install with one phrase</h2><p>Paste this into Codex or Claude Code with computer access. To install by hand, you need Python 3.11 or newer.</p>
+<pre id="prompt">Help me install and set up Open News Monitor.
+https://github.com/ozerova152-lab/open-news-monitor
+Download it to a folder we agree on, read AGENTS.md and guide me one step at a time. Check sources and ask before adding them. Offer safe initialization. Keep secrets local. Wait for permission before test delivery and scheduler setup.</pre><button type="button" data-copy hidden>Copy prompt</button><span role="status" data-status data-ok="Prompt copied" data-error="Select the text and copy it manually"></span></section>
+<section id="demo"><h2>Example digest</h2><article class="digest"><p class="eyebrow">Demo · Fictional publication</p><h3>City library opens a reading room</h3><p>Source: City Bulletin · 21 November 2026</p><p>The room serves individual readers and book club meetings.</p><a href="https://example.org/">Illustrative source link</a></article></section>
+<section id="schedule"><h2>Scheduling</h2><p>Manual runs need no scheduler. To automate runs, an external scheduler calls schedule-tick. Windows denied task registration on the test PC. Linux/macOS setup and scheduling have not been checked on real systems.</p></section>
+<section id="faq"><h2>FAQ</h2>
+<details><summary>Can I run the monitor on this page?</summary><p>This is a showcase. Install the program on your computer and run it from a terminal.</p></details>
+<details><summary>How do I avoid sending old news?</summary><p>Start with safe initialization. It remembers current publications without delivering them.</p></details>
+<details><summary>Are descriptions translated?</summary><p>Telegram and email can show a shortened source description. There is no built-in AI translation.</p></details>
+<details><summary>What has been checked?</summary><p>Telegram and Gmail passed live delivery tests. Google Sheets passed a prior live test, with no fresh access check. Excel 2010 imported the CSV, but saving CSV UTF-8 remains unverified.</p></details>
+</section></div></main>
+<footer><strong>Open News Monitor</strong><nav aria-label="Documentation"><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/README.en.md">Setup guide</a><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/docs/CHANNELS_RU.md">Channels (RU)</a><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/docs/SCHEDULING_RU.md">Scheduling (RU)</a><a href="https://github.com/ozerova152-lab/open-news-monitor/blob/main/LICENSE">MIT</a><a href="https://github.com/ozerova152-lab/open-news-monitor">GitHub</a></nav></footer>
+</body>
+</html>

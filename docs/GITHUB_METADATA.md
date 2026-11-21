@@ -27,4 +27,4 @@ ai-agent
 python
 ```
 
-GitHub searches repository names, descriptions, topics, and README content. The English README contains the principal category terms; `README.ru.md` makes the project understandable for Russian-speaking users.
+GitHub searches repository names, descriptions, topics, and README content. The main Russian guide is `README.md`. The complete English guide is `README.en.md`.

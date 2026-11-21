@@ -1,148 +1,153 @@
 ![Open News Monitor](assets/cover-news.jpg)
 
-# Open News Monitor
+Русский · [English](README.en.md)
 
-**A self-hosted, source-first news monitoring agent.**
+# Open News Monitor — Новостник
 
-Open News Monitor lets a person choose public sources, checks whether they can be collected safely, remembers what it has already seen, and creates a source-linked digest of new publications. It is a universal tool: the user chooses the subject and sources.
+Новостник помогает следить за публикациями на выбранных вами публичных сайтах и в новостных лентах. Вы выбираете источники и слова для отбора; программа запоминает уже встреченные материалы и собирает новые публикации со ссылками на оригинал.
 
-It does not search the entire web, publish content, or replace human judgement.
+Проект не просматривает весь интернет, не публикует новости от вашего имени и не принимает редакционных решений. Открывать и использовать найденные материалы решаете вы.
 
-## Start with Codex or Claude Code
+## Установка одной фразой
 
-1. Copy this repository URL and open the project in Codex or Claude Code.
-2. Ask: “Help me install and configure Open News Monitor step by step.”
-3. Answer the assistant's short questions about your topic, sources and delivery channel.
-4. Confirm any action involving an external account or a real test delivery.
+Откройте Codex или Claude Code с доступом к вашему компьютеру и отправьте ему этот текст. Помощник проведёт вас по шагам; отвечайте на его вопросы и подтверждайте выбор источников и каналов.
 
-The assistant can run safe local steps and explain the rest. It must never ask you to paste tokens, passwords or service-account keys into chat.
+```text
+Помоги установить и настроить Open News Monitor — Новостник.
+Репозиторий: https://github.com/ozerova152-lab/open-news-monitor
+Я могу не знать терминал и технические термины: объясняй просто и по одному шагу.
+Помоги скачать проект в выбранную мной папку, прочитай AGENTS.md и следуй его инструкциям.
+Сначала помоги выбрать и проверить мои источники. Не добавляй источник без моего «да».
+Предложи безопасную первую инициализацию без отправки старых публикаций.
+Не проси присылать в чат токены и пароли; перед реальной отправкой и настройкой расписания дождись моего разрешения.
+```
 
-## Current capabilities
+Для работы с компьютером нужен помощник с доступом к файлам и терминалу. Можно установить и использовать проект самостоятельно по инструкции ниже: ИИ-агент для работы программы не обязателен.
 
-- Check a public URL before adding it to a profile.
-- Connect RSS/Atom feeds and some public JSON sources after real publications have been confirmed.
-- Discover an RSS/Atom feed advertised by a regular web page.
-- Save a local SQLite history and avoid delivering the same link twice.
-- Create a safe first-run baseline: current publications are remembered but not delivered.
-- Create Markdown digests and local status reports.
-- Deliver through optional Telegram, email (including Gmail SMTP), and Google Sheets queues.
-- Run `doctor` to check local channel readiness without contacting external services.
-- Separate collection from delivery with `collect`, `deliver`, and `run`.
-- Optionally define a profile schedule and run `schedule-tick` from a Windows task.
-- Optionally manage sources in an Excel-friendly CSV registry.
+## Что вы получите
 
-Telegram and Gmail have passed controlled real-delivery checks. Google Sheets passed a real delivery and no-repeat check previously; current Google access has not been freshly confirmed. Local Markdown output has been checked. GitHub Actions passed on Windows (Python 3.11–3.13) and Ubuntu (Python 3.11–3.12). External delivery cannot be guaranteed in every network-failure scenario.
+- Свой профиль с подтверждёнными источниками и, при необходимости, словами для включения или исключения новостей.
+- Локальную подборку Markdown с заголовками, датами и ссылками на первоисточники и отчёт о состоянии последнего запуска.
+- Память на компьютере: повторно найденные ссылки не считаются новыми. Первая инициализация запоминает текущие публикации без отправки.
+- По желанию — доставку новых материалов в Telegram, по email или в Google Sheets после отдельной настройки. В Telegram и email можно включить короткий фрагмент исходного описания; он не переводится и не создаётся нейросетью.
 
-Plain HTML news pages without an advertised feed are not connected automatically. They need separately verified collection rules; there is no automatic HTML analyser yet. A graphical interface is not implemented.
+Программа выполняет сбор при запуске. Для автоматического запуска нужен отдельно настроенный и проверенный планировщик.
 
-## Windows quick start
+## Что понадобится
 
-Requirements: Python 3.11 or newer. Open PowerShell in the repository folder:
+- Компьютер с Windows и Python 3.11 или новее; для Windows-скриптов нужен установщик Python с командой `py`.
+- Интернет для установки и проверки публичных источников; Git нужен для команды скачивания ниже, либо можно скачать репозиторий архивом.
+- Адреса источников, которые вы хотите отслеживать. Для начала достаточно одной рабочей RSS/Atom-ленты.
+- Для внешних каналов — собственные настройки Telegram, почты или Google Sheets. Ключи и пароли хранятся локально, а не в чате.
+
+Windows-сценарий проверялся. Инструкции для [Linux и macOS](docs/SETUP_UNIX_RU.md) подготовлены, но установка и расписание на реальных системах отдельно не проверены.
+
+## Быстрый старт на Windows
+
+**Терминал** — окно для ввода команд. Откройте PowerShell, вставляйте команды по одной и нажимайте Enter. Если проект уже скачан, начните с шага 2.
+
+### 1. Скачайте проект
 
 ```powershell
+git clone https://github.com/ozerova152-lab/open-news-monitor.git
+cd open-news-monitor
+```
+
+Должна открыться папка проекта. Если Git не установлен, скачайте репозиторий с GitHub как ZIP, распакуйте его и откройте PowerShell в полученной папке.
+
+### 2. Установите зависимости
+
+```powershell
+py -3 --version
 .\scripts\setup-windows.ps1
+```
+
+Версия Python должна быть не ниже 3.11. Скрипт создаст локальное окружение и установит программу; он не создаёт профиль и ничего не отправляет. Если PowerShell запрещает запуск скрипта, используйте ручной вариант из [инструкции Windows](docs/SETUP_RU.md).
+
+### 3. Создайте свой монитор
+
+```powershell
 .\scripts\create-monitor.ps1 -Name my-monitor
 ```
 
-The wizard asks for source URLs one at a time, shows the check result, and asks for explicit confirmation before adding a source. Leave the delivery-choice field empty to keep the first run local: Markdown and SQLite only.
+Мастер попросит название мониторинга и URL источников по одному, проверит каждый и спросит, добавлять ли его. Нужен хотя бы один подтверждённый источник. Затем можно указать слова для отбора и каналы доставки; пустой выбор каналов оставит только локальную Markdown-подборку.
 
-For a larger editable source list, use the [CSV registry guide (Russian)](docs/SOURCES_CSV_RU.md) and the safe [CSV profile example](examples/csv-monitor-profile-example.json). The interactive wizard is best for a few sources; the CSV registry is best for a maintained Excel list.
+В конце мастер предложит запомнить текущие публикации как отправную точку. Согласитесь, если не хотите получить старые материалы как новые. Для этого шага программа обращается к источникам, но не отправляет публикации. Если какой-то источник недоступен, проверьте результат отдельно.
 
-For an optional delivery channel, follow the [channel setup guide](docs/CHANNELS_RU.md), run `doctor`, and separately approve the first real test delivery. You can start with local Markdown output.
+### 4. Проверьте настройки и запустите монитор
 
-After the profile is created, the wizard offers to remember current publications as a safe starting point. Choose `Да` (or `yes`) to prevent existing feed entries from being delivered later. The profile is saved in `config/local/`, which Git ignores.
+```powershell
+.\.venv\Scripts\python.exe -m open_news_monitor doctor config\local\my-monitor.json
+```
 
-Run the monitor and view its status:
+`doctor` проверяет настройки на компьютере, не связываясь с внешними сервисами. `ГОТОВО` означает локальную готовность, а не подтверждённый доступ к Telegram, почте или Google.
+
+Если вы пропустили инициализацию, выполните её до обычного запуска:
+
+```powershell
+.\.venv\Scripts\python.exe -m open_news_monitor run config\local\my-monitor.json --initialize
+```
+
+После настройки и разрешённой проверки выбранных внешних каналов запустите сбор и посмотрите состояние:
 
 ```powershell
 .\.venv\Scripts\python.exe -m open_news_monitor run config\local\my-monitor.json
 .\.venv\Scripts\python.exe -m open_news_monitor status config\local\my-monitor.json
 ```
 
-Before the first ordinary run, check local configuration:
+Обычный `run` может отправить новые публикации во все включённые каналы. Профиль хранится в `config/local/`, а результаты и память — в `runtime/`.
 
-```powershell
-.\.venv\Scripts\python.exe -m open_news_monitor doctor config\local\my-monitor.json
-```
+## Свои источники
 
-`doctor` sends nothing and makes no network requests. `READY` means the required local settings exist; it does not confirm access to an external service.
+Мастер проверяет RSS/Atom и некоторые открытые JSON-источники. Иногда он находит ленту на обычной странице. Результаты проверки:
 
-## Short descriptions in Telegram and email
-
-Older profiles keep showing only the title, source and link. To include a short excerpt of the publication's existing description in Telegram and email, add this optional section:
-
-```json
-"presentation": {
-  "summary_mode": "excerpt",
-  "summary_max_chars": 400
-}
-```
-
-`excerpt` normalizes and shortens the source description without AI, translation, or added facts. Set `summary_mode` to `none` to hide excerpts.
-
-If you decline the first-run baseline, run it later without delivery:
-
-```powershell
-.\.venv\Scripts\python.exe -m open_news_monitor run config\local\my-monitor.json --initialize
-```
-
-Some automated PowerShell input pipelines can corrupt Cyrillic confirmation text. In that case, use the safe equivalent `yes`. In normal interactive use the wizard also accepts `Да` and `д`.
-
-## Optional Windows scheduling
-
-Profiles can include an optional `schedule` section. `schedule-tick` performs only the collection and deliveries due at that moment; it is not a background process. A Windows task can call it after sign-in and then approximately every five minutes.
-
-Before creating a task, run `doctor` and inspect the profile. The task commands always require an explicit confirmation for changes:
-
-```powershell
-.\.venv\Scripts\open-news-monitor.exe schedule install config\local\my-monitor.json
-.\.venv\Scripts\open-news-monitor.exe schedule status config\local\my-monitor.json
-```
-
-Use `schedule disable`, `schedule enable`, or `schedule remove` with the same profile to control only that profile's task. Task creation may still be restricted by local Windows policy; never run it as administrator unless the user has explicitly agreed.
-
-Registration was denied on the tested Windows computer, so automatic execution there has not been confirmed. Verify scheduling on the target computer before relying on it. Linux/macOS setup and scheduler instructions have not been separately checked on real systems.
-
-## Source check results
-
-`probe-source` and the setup wizard use four clear results:
-
-| Result | Meaning |
+| Результат | Что это значит |
 | --- | --- |
-| `READY` | Real publications with title, date and direct link were confirmed. The source can be added after confirmation. |
-| `NEEDS_SETUP` | The site is reachable, but the current collector cannot safely connect it automatically. |
-| `UNSUPPORTED` | The available format is outside the current collector capabilities. |
-| `ERROR` | The check could not finish because of a technical problem. This does not mean the source is unsupported. |
+| `READY` | Подтверждены публикации с заголовком, датой и прямой ссылкой; источник можно добавить после вашего согласия. |
+| `NEEDS_SETUP` | Для безопасного подключения нужна дополнительная настройка. |
+| `UNSUPPORTED` | Текущий сборщик не поддерживает обнаруженный формат. |
+| `ERROR` | Проверку не удалось завершить из-за технической ошибки. |
 
-Check a URL without creating a profile:
+Обычные HTML-страницы без обнаруженной ленты автоматически не подключаются: для них нужны отдельно проверенные правила. Для большого списка доступен [CSV-реестр](docs/SOURCES_CSV_RU.md): UTF-8 с BOM, разделитель `;`. В инструкции есть ограничения сохранения для Excel 2010.
 
-```powershell
-.\.venv\Scripts\python.exe -m open_news_monitor probe-source https://example.org/news
-```
+Чтобы добавить источник в существующий монитор, сначала проверьте его отдельно командой `probe-source`. После подтверждения добавьте его в действующий список источников профиля или его CSV-реестр. Не запускайте мастер поверх существующего профиля: он записывает профиль заново.
 
-## What has been verified
+## Куда доставлять новости
 
-Local automated tests and a full temporary-profile check have verified RSS source checks, profile creation, first-run initialization, SQLite deduplication, status reporting, and partial failure handling. The real-source integration check used public GitHub Blog and Python Insider RSS feeds.
+Все каналы необязательны. Выбирайте их в мастере или настройте с помощью помощника. Секреты вводятся локально и не отправляются в чат.
 
-Still in development: a graphical interface and automatic analysis of arbitrary HTML pages. Windows task creation is locally validated through the Task Scheduler COM API, but must be checked on each user's computer before it is treated as working.
+- **Telegram:** бот, его токен и ID согласованного тестового чата.
+- **Email:** SMTP-настройки, данные отправителя и адрес тестового получателя; Gmail поддерживается через SMTP и пароль приложения.
+- **Google Sheets:** таблица и лист, включённый Google Sheets API, сервисный аккаунт с доступом к таблице и локальный JSON-ключ. Дополнительный пакет устанавливайте только после выбора этого канала.
 
-## Privacy and safety
+После настройки запустите `doctor`. Перед первой реальной отправкой отдельно подтвердите тест в выбранный чат, адрес или таблицу. Подробные шаги: [подключение каналов](docs/CHANNELS_RU.md). Telegram и Gmail прошли контролируемые реальные тесты; Google Sheets ранее прошёл реальный тест, но текущий доступ к нему отдельно не подтверждён.
 
-Never commit bot tokens, chat IDs, SMTP passwords, Google service-account keys, `.env` files, personal profiles, or runtime databases. The included `.gitignore` excludes these local files.
+## Автоматическое расписание
 
-## Documentation
+Без планировщика программа работает при ручном запуске. Необязательный `schedule-tick` выполняет действия, время которых наступило по настройкам профиля; внешняя задача запускает его регулярно. В Windows предусмотрены команды установки, проверки, включения, отключения и удаления задачи своего профиля. Перед изменением задачи требуется явное согласие.
 
-- [Russian README](README.ru.md)
-- [Russian Windows setup guide](docs/SETUP_RU.md)
-- [Linux and macOS first-run guide (Russian)](docs/SETUP_UNIX_RU.md)
-- [Automatic scheduling guide (Russian)](docs/SCHEDULING_RU.md)
-- [Telegram, Gmail, and Google Sheets setup](docs/CHANNELS_RU.md)
-- [CSV source registry guide (Russian)](docs/SOURCES_CSV_RU.md)
-- [Instructions for Codex](AGENTS.md)
-- [Instructions for Claude Code](CLAUDE.md)
-- [Project map](КАРТА_ПРОЕКТА.md)
-- [Source research standard](skills/news-source-research/SKILL.md)
+На проверенном компьютере Windows отказала в регистрации задачи. Не считайте расписание работающим, пока оно не прошло контролируемую проверку на вашем компьютере. Варианты для Linux/macOS также требуют реальной проверки. Параметры и остановка: [руководство по расписанию](docs/SCHEDULING_RU.md).
 
-## License
+## Если что-то не получилось
 
-[MIT](LICENSE)
+| Что произошло | Что сделать |
+| --- | --- |
+| `py` не найден или версия Python ниже требуемой | Установите Python 3.11 или новее и проверьте `py -3 --version`; затем повторите установку. |
+| PowerShell не запускает скрипт | Используйте ручные команды из [инструкции Windows](docs/SETUP_RU.md). |
+| Источник не добавляется | Посмотрите статус проверки; попробуйте другую ленту или выясните, какая настройка нужна. Не включайте неподтверждённый источник. |
+| `doctor` сообщает о недостающих данных | Проверьте локальную настройку выбранного канала по [инструкции](docs/CHANNELS_RU.md); не присылайте секреты в чат. |
+| Новости не появились | Проверьте `status`: новых публикаций может не быть, либо источник или канал вернул ошибку. |
+| CSV открылся в одном столбце или с нечитаемым текстом | Импортируйте его с UTF-8 и разделителем `;`; см. [инструкцию CSV](docs/SOURCES_CSV_RU.md). |
+| Задача Windows не создаётся | Проверьте сообщение и [ограничения планировщика](docs/SCHEDULING_RU.md); не повышайте права без отдельного решения. |
+
+## Подробнее
+
+- [Установка на Windows](docs/SETUP_RU.md) · [Linux и macOS](docs/SETUP_UNIX_RU.md)
+- [Telegram, email и Google Sheets](docs/CHANNELS_RU.md) · [Расписание](docs/SCHEDULING_RU.md)
+- [CSV-реестр](docs/SOURCES_CSV_RU.md) · [Пример CSV-профиля](examples/csv-monitor-profile-example.json)
+- [Инструкции для Codex](AGENTS.md) · [Инструкции для Claude Code](CLAUDE.md) · [Стандарт проверки источников](skills/news-source-research/SKILL.md)
+- [Карта проекта](КАРТА_ПРОЕКТА.md) · [Сообщить о проблеме](https://github.com/ozerova152-lab/open-news-monitor/issues)
+
+## Лицензия
+
+[MIT](LICENSE).
