@@ -1,6 +1,9 @@
 import json
 import tempfile
 import unittest
+import io
+import sys
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -8,6 +11,7 @@ from unittest.mock import patch
 from open_news_monitor.models import Article
 from open_news_monitor.pipeline import collect_monitor, deliver_monitor
 from open_news_monitor.store import ArticleStore
+from open_news_monitor.cli import main
 
 
 class FreshnessTests(unittest.TestCase):
@@ -73,6 +77,13 @@ class FreshnessTests(unittest.TestCase):
                     self.assertEqual([fresh.url], [x.article.url for x in sender.call_args.args[1]])
                     deliver_monitor(config, channels={"telegram"})
                     sender.assert_called_once()
+            profile = root / "profile.json"
+            profile.write_text(json.dumps(config), encoding="utf-8")
+            captured = io.StringIO()
+            with patch.object(sys, "argv", ["open-news-monitor", "withheld", str(profile)]), redirect_stdout(captured):
+                main()
+            self.assertIn(doubtful.url, captured.getvalue())
+            self.assertIn("uncertain", captured.getvalue())
             events = [json.loads(line) for line in
                       (root / "monitor.status.history.jsonl").read_text(encoding="utf-8").splitlines()]
             snapshots = [event for event in events if "event" not in event]

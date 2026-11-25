@@ -127,6 +127,9 @@ def _run_monitor_locked(
         store.connection.execute("""CREATE TABLE IF NOT EXISTS source_baselines (
             source_id TEXT NOT NULL, source_url TEXT NOT NULL, first_success TEXT NOT NULL,
             PRIMARY KEY (source_id, source_url))""")
+        store.connection.execute("""CREATE TABLE IF NOT EXISTS withheld_publications (
+            url TEXT PRIMARY KEY, source_name TEXT NOT NULL, title TEXT NOT NULL,
+            published_at TEXT, detected_at TEXT NOT NULL, reason TEXT NOT NULL)""")
         store.connection.commit()
     try:
         telegram_enabled = bool(config.get("outputs", {}).get("telegram", {}).get("enabled"))
@@ -165,6 +168,13 @@ def _run_monitor_locked(
                     freshness = classify(article.published_at, detected_at, baseline, max_age)
                     if freshness != "new":
                         review.append({"title": article.title, "url": article.url, "reason": freshness})
+                        if store:
+                            with store.connection:
+                                store.connection.execute(
+                                    "INSERT OR IGNORE INTO withheld_publications VALUES (?, ?, ?, ?, ?, ?)",
+                                    (article.url, article.source_name, article.title, article.published_at,
+                                     detected_at.isoformat(), freshness),
+                                )
                         reason = None
                 enqueue_telegram = bool(reason and not initialize and telegram_enabled)
                 enqueue_email = bool(reason and not initialize and email_enabled)
