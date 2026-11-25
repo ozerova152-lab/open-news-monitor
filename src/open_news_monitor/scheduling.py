@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from .config import enabled_sources
+from .freshness import publication_time
 from .locking import DatabaseRunLock
+from .outputs import send_telegram_notice
 from .pipeline import _deliver_monitor_locked, _run_monitor_locked
 from .store import ArticleStore
 
@@ -97,6 +100,14 @@ def schedule_configuration_problem(config: dict) -> str | None:
 
 
 def schedule_tick(config: dict, *, now: datetime | None = None) -> ScheduleTickReport:
+    from .status import record_attempt
+
+    return record_attempt(config, "schedule", lambda: _schedule_tick(config, now=now),
+                          result_kind=lambda report: "errors" if report.errors else
+                          ("finished" if report.did_work else "skipped"))
+
+
+def _schedule_tick(config: dict, *, now: datetime | None = None) -> ScheduleTickReport:
     """Run only the collection and deliveries that are due at this tick.
 
     Collection uses the current interval bucket. A computer that was off does
@@ -154,9 +165,53 @@ def schedule_tick(config: dict, *, now: datetime | None = None) -> ScheduleTickR
                             delivery_key, "deliver", channel, f"{local_now.date().isoformat()}T{due_time}", local_now.isoformat()
                         )
                         report.delivered_channels.append(channel)
+                        if channel == "telegram":
+                            _maybe_send_empty_notice(config, store, local_now, collection_key, _status, report)
         finally:
             store.close()
     return report
+
+
+def _maybe_send_empty_notice(config, store, local_now, collection_key, status, report):
+    settings = config.get("empty_news_notice", {})
+    channel = status.get("telegram", {})
+    if (not settings.get("enabled") or report.errors or channel.get("status") != "not_needed"
+            or channel.get("withheld_urls") or not store.schedule_run_completed(collection_key)):
+        return
+    sources = enabled_sources(config)
+    table = store.connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE name='source_baselines'"
+    ).fetchone()
+    if not sources or not table or not all(store.connection.execute(
+        "SELECT 1 FROM source_baselines WHERE source_id=? AND source_url=?", (source.id, source.url)
+    ).fetchone() for source in sources):
+        return
+    start = datetime.combine(local_now.date(), time.min, local_now.tzinfo)
+    end = start + timedelta(days=1)
+    candidates = store.connection.execute(
+        "SELECT published_at FROM articles WHERE julianday(detected_at) >= julianday(?) "
+        "AND julianday(detected_at) < julianday(?)", (start.isoformat(), end.isoformat()),
+    )
+    if any((stamp := publication_time(row[0])) is None or stamp > local_now for row in candidates):
+        return
+    if store.connection.execute(
+        "SELECT 1 FROM articles WHERE matched_reason IS NOT NULL "
+        "AND julianday(detected_at) >= julianday(?) AND julianday(detected_at) < julianday(?) LIMIT 1",
+        (start.isoformat(), end.isoformat()),
+    ).fetchone():
+        return
+    day = local_now.date().isoformat()
+    key = f"empty-notice:telegram:{local_now.tzinfo}:{day}"
+    if store.schedule_run_completed(key):
+        return
+    # Reserve before external delivery. After a crash or ambiguous response,
+    # never retry a notice automatically for this day.
+    store.mark_schedule_run_completed(key, "deliver", "telegram", day, local_now.isoformat())
+    try:
+        send_telegram_notice("No new stories today." if settings.get("language") == "en"
+                             else "За сегодня новых новостей нет")
+    except Exception:
+        report.errors.append("Telegram: результат уведомления не подтверждён; автоматического повтора не будет.")
 
 
 def render_schedule_tick_report(report: ScheduleTickReport) -> str:

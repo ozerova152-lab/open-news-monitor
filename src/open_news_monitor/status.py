@@ -8,6 +8,7 @@ from typing import Any
 def write_status(path: str | Path, status: dict[str, Any]) -> None:
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    append_run_event(destination, status)
     destination.write_text(json.dumps(status, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
@@ -55,3 +56,40 @@ def render_status(status: dict[str, Any] | None) -> str:
     if errors:
         lines.extend(["", "## Ошибки", "", *[f"- {error}" for error in errors]])
     return "\n".join(lines)
+
+
+def append_run_event(status_path, event):
+    import os
+
+    path = Path(status_path).with_suffix(".history.jsonl")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8")
+    fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+    try:
+        if os.write(fd, payload) != len(payload):
+            raise OSError("Incomplete history record")
+    finally:
+        os.close(fd)
+
+
+def record_attempt(config, mode, action, *, result_kind=None):
+    from datetime import datetime, timezone
+    from uuid import uuid4
+    from .locking import MonitorAlreadyRunningError
+
+    monitor = config["monitor"]
+    db = monitor.get("database_path", "runtime/open-news-monitor.sqlite3")
+    path = monitor.get("status_path") or Path(db).with_suffix(".status.json")
+    event = {"id": uuid4().hex, "monitor_name": monitor["name"], "mode": mode,
+             "started_at": datetime.now(timezone.utc).isoformat()}
+    append_run_event(path, {**event, "event": "started"})
+    try:
+        result = action()
+    except BaseException as error:
+        append_run_event(path, {**event, "finished_at": datetime.now(timezone.utc).isoformat(),
+                               "event": "parallel" if isinstance(error, MonitorAlreadyRunningError) else "aborted",
+                               "error_type": type(error).__name__})
+        raise
+    append_run_event(path, {**event, "finished_at": datetime.now(timezone.utc).isoformat(),
+                           "event": result_kind(result) if result_kind else "finished"})
+    return result

@@ -44,7 +44,7 @@ def fetch_feed(source: Source, timeout_seconds: int = 20) -> list[Article]:
         if not title or not link:
             continue
         summary = _text(entry, "description") or _text(entry, "{*}summary") or _text(entry, "{*}content") or ""
-        published = _text(entry, "pubDate") or _text(entry, "{*}published") or _text(entry, "{*}updated")
+        published = _text(entry, "pubDate") or _text(entry, "{*}published")
         articles.append(
             Article(
                 source_id=source.id,

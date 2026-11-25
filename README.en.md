@@ -4,6 +4,8 @@
 
 # Open News Monitor
 
+To run with Codex closed, use a system scheduler on a powered-on computer or an always-on Linux server. See the [scheduling guide](docs/SCHEDULING_RU.md) and [server setup](docs/SERVER_SETUP.md).
+
 [Open the project showcase](https://ozerova152-lab.github.io/open-news-monitor/en.html)
 
 Open News Monitor helps you follow publications from public websites and news feeds you choose. You select sources and optional filter words; the program remembers previously seen items and gathers new publications with links to their originals.
@@ -23,7 +25,7 @@ I may not know terminal commands or technical terms. Explain one step at a time 
 Help me download the project to a folder I choose, then read AGENTS.md and follow its instructions.
 Ask whether I have sites already or want suggestions based on a topic. If I need suggestions, give me a few links and explain why they fit. Check which sites can be connected. Do not add a source without my confirmation.
 Offer a safe first initialization that does not send old publications.
-Do not ask me to paste tokens or passwords into chat; wait for my permission before real delivery or setting up a schedule.
+Offer a manual run, a schedule on my computer, or an always-on Linux server. Do not ask me to paste tokens or passwords into chat; wait for my permission before real delivery or setting up a schedule.
 ```
 
 Start with a digest saved on your computer. You can set up Telegram, email or Google Sheets later.

@@ -1,0 +1,18 @@
+[Unit]
+Description=Open News Monitor schedule check
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=open-news-monitor
+Group=open-news-monitor
+WorkingDirectory=/etc/open-news-monitor
+Environment=PYTHONIOENCODING=utf-8
+ExecStart=/opt/open-news-monitor/.venv/bin/open-news-monitor schedule-tick /etc/open-news-monitor/profile.json
+StateDirectory=open-news-monitor
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
