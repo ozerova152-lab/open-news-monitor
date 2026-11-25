@@ -93,7 +93,7 @@ class WindowsSchedulerTests(unittest.TestCase):
             profile.touch()
             (root / "pyproject.toml").touch()
             spec = build_task_spec(self._config(), profile, python_path=sys.executable, user_id="TEST\\User")
-            self.assertEqual(root, spec.working_directory)
+            self.assertEqual(root.resolve(), spec.working_directory)
 
     def _config(self) -> dict:
         return {
