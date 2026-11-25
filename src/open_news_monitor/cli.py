@@ -69,6 +69,10 @@ def main() -> None:
     for action in ("validate", "check"):
         action_parser = sources_actions.add_parser(action)
         action_parser.add_argument("config", help="Path to a monitor JSON file.")
+    withheld = subparsers.add_parser("withheld", help="Show publications withheld from automatic delivery.")
+    withheld.add_argument("config")
+    history = subparsers.add_parser("history", help="Show locally recorded runs (JSON Lines).")
+    history.add_argument("config")
     status = subparsers.add_parser("status", help="Show the health report from the last ordinary run.")
     status.add_argument("config", help="Path to a monitor JSON file.")
     doctor = subparsers.add_parser("doctor", help="Check local readiness without sending anything.")
@@ -104,10 +108,36 @@ def main() -> None:
         print(f"Configuration is valid: {args.config}")
         return
 
-    if args.command == "status":
+    if args.command == "withheld":
+        import sqlite3
+        db = Path(config["monitor"].get("database_path", "runtime/open-news-monitor.sqlite3")).resolve()
+        if not db.is_file():
+            print("Удержанных публикаций пока нет.")
+            return
+        from contextlib import closing
+        with closing(sqlite3.connect(db.as_uri() + "?mode=ro", uri=True)) as connection:
+            exists = connection.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='withheld_publications'").fetchone()
+            rows = connection.execute(
+                "SELECT source_name, title, url, published_at, detected_at, reason "
+                "FROM withheld_publications ORDER BY detected_at DESC"
+            ).fetchall() if exists else []
+        if not rows:
+            print("Удержанных публикаций пока нет.")
+        for source, title, url, published, detected, reason in rows:
+            print(f"{title}\n{source} | {url}\nДата: {published or 'не указана'}; обнаружено: {detected}; причина: {reason}\n")
+        return
+
+    if args.command in {"status", "history"}:
         database_path = config["monitor"].get("database_path", "runtime/open-news-monitor.sqlite3")
         status_path = config["monitor"].get("status_path") or str(Path(database_path).with_suffix(".status.json"))
-        print(render_status(read_status(status_path)))
+        if args.command == "history":
+            path = Path(status_path).with_suffix(".history.jsonl")
+            if path.is_file():
+                print(path.read_text(encoding="utf-8"), end="")
+            else:
+                print("No run history yet.")
+        else:
+            print(render_status(read_status(status_path)))
         return
 
     if args.command == "doctor":
@@ -116,7 +146,10 @@ def main() -> None:
 
     if args.command == "schedule-tick":
         try:
-            print(render_schedule_tick_report(schedule_tick(config)))
+            report = schedule_tick(config)
+            print(render_schedule_tick_report(report))
+            if report.errors:
+                raise SystemExit(1)
         except (MonitorAlreadyRunningError, ScheduleConfigurationError) as error:
             parser.error(str(error))
         return

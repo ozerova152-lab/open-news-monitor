@@ -76,6 +76,21 @@ def validate_config(config: dict) -> None:
     if not isinstance(outputs, dict):
         raise ConfigurationError("outputs must be an object.")
 
+    freshness = config.get("freshness", {})
+    if not isinstance(freshness, dict):
+        raise ConfigurationError("freshness must be an object.")
+    age = freshness.get("max_age_hours")
+    if age is not None and (type(age) is not int or not 1 <= age <= 720):
+        raise ConfigurationError("freshness.max_age_hours must be an integer from 1 to 720.")
+
+    notice = config.get("empty_news_notice", {})
+    if (not isinstance(notice, dict)
+            or type(notice.get("enabled", False)) is not bool
+            or notice.get("language", "ru") not in ("ru", "en")):
+        raise ConfigurationError("empty_news_notice requires enabled (boolean) and language (ru or en).")
+    if notice.get("enabled") and age is None:
+        raise ConfigurationError("empty_news_notice requires freshness.max_age_hours.")
+
     presentation = config.get("presentation", {})
     if not isinstance(presentation, dict):
         raise ConfigurationError("presentation must be an object.")

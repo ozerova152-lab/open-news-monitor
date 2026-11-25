@@ -66,6 +66,35 @@ class _FakeWindowsScheduler:
 
 
 class WindowsSchedulerTests(unittest.TestCase):
+    def test_access_denied_uses_unprivileged_registration_without_force(self):
+        with tempfile.TemporaryDirectory() as directory:
+            spec = self._spec(Path(directory))
+            fallback = []
+
+            def runner(arguments):
+                if arguments[0] == "schtasks.exe":
+                    return CommandResult(1, stderr="The system cannot find the file specified.")
+                script = base64.b64decode(arguments[-1]).decode("utf-16-le")
+                if "Register-ScheduledTask" not in script:
+                    return CommandResult(1, stdout='{"ok":false,"hresult":"0x80070005"}')
+                fallback.append(script)
+                return CommandResult(0)
+
+            WindowsTaskScheduler(runner).create(spec)
+            self.assertEqual(1, len(fallback))
+            self.assertIn("-RunLevel Limited", fallback[0])
+            self.assertNotIn("-Force", fallback[0])
+
+    def test_standard_local_profile_uses_project_root(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / "config" / "local" / "profile.json"
+            profile.parent.mkdir(parents=True)
+            profile.touch()
+            (root / "pyproject.toml").touch()
+            spec = build_task_spec(self._config(), profile, python_path=sys.executable, user_id="TEST\\User")
+            self.assertEqual(root.resolve(), spec.working_directory)
+
     def _config(self) -> dict:
         return {
             "monitor": {"name": "Task scheduler test"},

@@ -1,0 +1,10 @@
+[Unit]
+Description=Check when Open News Monitor is due
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+Persistent=true
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target

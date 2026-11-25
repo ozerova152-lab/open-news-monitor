@@ -73,19 +73,30 @@ def send_telegram(monitor_name: str, findings: list[Finding], *, on_confirmed=No
     if not token or not chat_id:
         raise RuntimeError("Telegram is enabled but ONM_TELEGRAM_BOT_TOKEN or ONM_TELEGRAM_CHAT_ID is missing.")
     for text, chunk in telegram_message_chunks(monitor_name, findings, presentation=presentation):
-        request = Request(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            data=f"chat_id={quote(chat_id)}&text={quote(text)}&disable_web_page_preview=true".encode(),
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-            method="POST",
-        )
-        with urlopen(request, timeout=20) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-        if not payload.get("ok"):
-            raise RuntimeError(f"Telegram rejected the message: {payload}")
+        _post_telegram(text, token, chat_id)
         if on_confirmed is not None:
             on_confirmed(chunk)
 
+
+def send_telegram_notice(text: str) -> None:
+    token = os.getenv("ONM_TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("ONM_TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        raise RuntimeError("Telegram credentials are missing.")
+    _post_telegram(text, token, chat_id)
+
+
+def _post_telegram(text: str, token: str, chat_id: str) -> None:
+    request = Request(
+        f"https://api.telegram.org/bot{token}/sendMessage",
+        data=f"chat_id={quote(chat_id)}&text={quote(text)}&disable_web_page_preview=true".encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        method="POST",
+    )
+    with urlopen(request, timeout=20) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    if not payload.get("ok"):
+        raise RuntimeError(f"Telegram rejected the message: {payload}")
 
 def send_email(
     monitor_name: str, recipients: list[str], findings: list[Finding], *, on_confirmed=None,

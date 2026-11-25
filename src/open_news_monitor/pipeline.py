@@ -6,6 +6,7 @@ from pathlib import Path
 
 from .config import enabled_sources
 from .filtering import match_article
+from .freshness import classify
 from .models import Finding
 from .outputs import append_google_sheet, render_markdown, send_email, send_telegram, write_markdown
 from .html_collector import fetch_html
@@ -13,7 +14,7 @@ from .json_collector import fetch_json
 from .locking import DatabaseRunLock
 from .rss import SourceFetchError, fetch_feed
 from .store import ArticleStore
-from .status import write_status
+from .status import record_attempt, write_status
 
 
 @dataclass
@@ -82,14 +83,19 @@ def run_monitor(
 ) -> tuple[list[Finding], list[str], str]:
     """Run one complete, database-locked monitoring cycle."""
     database_path = config["monitor"].get("database_path", "runtime/open-news-monitor.sqlite3")
-    with DatabaseRunLock(database_path):
-        return _run_monitor_locked(
-            config,
-            dry_run=dry_run,
-            initialize=initialize,
-            initialization_report=initialization_report,
-            deliver=deliver,
-        )
+    def execute():
+        with DatabaseRunLock(database_path):
+            return _run_monitor_locked(
+                config,
+                dry_run=dry_run,
+                initialize=initialize,
+                initialization_report=initialization_report,
+                deliver=deliver,
+            )
+    if dry_run:
+        return execute()
+    return record_attempt(config, "initialization" if initialize else "ordinary" if deliver else "collection", execute)
+
 
 
 def _run_monitor_locked(
@@ -113,7 +119,18 @@ def _run_monitor_locked(
     }
 
     database_path = monitor.get("database_path", "runtime/open-news-monitor.sqlite3")
+    policy = config.get("freshness", {})
+    max_age = policy.get("max_age_hours")
+    review: list[dict[str, str]] = []
     store = None if dry_run else ArticleStore(database_path)
+    if store and max_age is not None:
+        store.connection.execute("""CREATE TABLE IF NOT EXISTS source_baselines (
+            source_id TEXT NOT NULL, source_url TEXT NOT NULL, first_success TEXT NOT NULL,
+            PRIMARY KEY (source_id, source_url))""")
+        store.connection.execute("""CREATE TABLE IF NOT EXISTS withheld_publications (
+            url TEXT PRIMARY KEY, source_name TEXT NOT NULL, title TEXT NOT NULL,
+            published_at TEXT, detected_at TEXT NOT NULL, reason TEXT NOT NULL)""")
+        store.connection.commit()
     try:
         telegram_enabled = bool(config.get("outputs", {}).get("telegram", {}).get("enabled"))
         email_enabled = bool(config.get("outputs", {}).get("email", {}).get("enabled"))
@@ -135,10 +152,30 @@ def _run_monitor_locked(
                 errors.append(message)
                 source_statuses.append({"name": source.name, "status": "error", "error": message, "saved": 0})
                 continue
+            baseline = None
+            if store and max_age is not None:
+                row = store.connection.execute(
+                    "SELECT first_success FROM source_baselines WHERE source_id=? AND source_url=?",
+                    (source.id, source.url),
+                ).fetchone()
+                if row:
+                    baseline = datetime.fromisoformat(row[0])
             for article in articles:
                 if store and store.has_seen(article.url):
                     continue
                 reason = match_article(article, include_any, exclude_any)
+                if reason and max_age is not None and not initialize:
+                    freshness = classify(article.published_at, detected_at, baseline, max_age)
+                    if freshness != "new":
+                        review.append({"title": article.title, "url": article.url, "reason": freshness})
+                        if store:
+                            with store.connection:
+                                store.connection.execute(
+                                    "INSERT OR IGNORE INTO withheld_publications VALUES (?, ?, ?, ?, ?, ?)",
+                                    (article.url, article.source_name, article.title, article.published_at,
+                                     detected_at.isoformat(), freshness),
+                                )
+                        reason = None
                 enqueue_telegram = bool(reason and not initialize and telegram_enabled)
                 enqueue_email = bool(reason and not initialize and email_enabled)
                 if store and store.add_with_delivery_queues(
@@ -152,6 +189,12 @@ def _run_monitor_locked(
                     saved += 1
                 if reason and not initialize:
                     findings.append(Finding(article=article, reason=reason, detected_at=detected_at))
+            if store and max_age is not None and articles:
+                with store.connection:
+                    store.connection.execute(
+                        "INSERT OR IGNORE INTO source_baselines VALUES (?, ?, ?)",
+                        (source.id, source.url, detected_at.isoformat()),
+                    )
             source_statuses.append({"name": source.name, "status": "ok", "articles": len(articles), "saved": saved})
 
         markdown = render_markdown(monitor["name"], findings, errors)
@@ -160,6 +203,10 @@ def _run_monitor_locked(
                 "New matching publications: **0**",
                 "Initial baseline saved. Existing feed items were recorded without delivery.",
             ).replace("No new matching publications were found.", "The next ordinary run will deliver only publications that appear after this baseline.")
+        if review:
+            markdown += "\n## Withheld for review\n" + "\n".join(
+                f"- {row['reason']}: {row['title']} | {row['url']}" for row in review
+            ) + "\n"
         if dry_run:
             return findings, errors, markdown
 
@@ -181,8 +228,10 @@ def _run_monitor_locked(
             {
                 "monitor_name": monitor["name"],
                 "ran_at": detected_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
                 "mode": "initialization" if initialize else ("ordinary" if deliver else "collection"),
                 "new_matching_publications": len(findings),
+                "withheld": review,
                 "sources": source_statuses,
                 "deliveries": delivery_status,
                 "errors": errors,
@@ -200,8 +249,10 @@ def deliver_monitor(
 ) -> tuple[list[str], dict[str, object]]:
     """Deliver existing queue items without fetching sources."""
     database_path = config["monitor"].get("database_path", "runtime/open-news-monitor.sqlite3")
-    with DatabaseRunLock(database_path):
-        return _deliver_monitor_locked(config, channels=channels)
+    def execute():
+        with DatabaseRunLock(database_path):
+            return _deliver_monitor_locked(config, channels=channels)
+    return record_attempt(config, "delivery", execute)
 
 
 def _deliver_monitor_locked(
@@ -225,6 +276,7 @@ def _deliver_monitor_locked(
             {
                 "monitor_name": monitor["name"],
                 "ran_at": detected_at.isoformat(),
+                "finished_at": datetime.now(timezone.utc).isoformat(),
                 "mode": "delivery",
                 "new_matching_publications": 0,
                 "sources": [],
@@ -258,8 +310,34 @@ def _deliver_queued(
     telegram = outputs.get("telegram", {})
     presentation = config.get("presentation")
     presentation_args = {"presentation": presentation} if presentation is not None else {}
+    def eligible(queued, channel):
+        max_age = config.get("freshness", {}).get("max_age_hours")
+        if max_age is None:
+            return queued
+        # Old queues may predate this policy; never trust their enqueue timestamp.
+        exists = store.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='source_baselines'"
+        ).fetchone()
+        sources = {source.id: source for source in enabled_sources(config)}
+        accepted = []
+        withheld = []
+        for finding in queued:
+            source = sources.get(finding.article.source_id)
+            row = store.connection.execute(
+                "SELECT first_success FROM source_baselines WHERE source_id=? AND source_url=?",
+                (source.id, source.url),
+            ).fetchone() if exists and source else None
+            baseline = datetime.fromisoformat(row[0]) if row else None
+            if classify(finding.article.published_at, detected_at, baseline, max_age) == "new":
+                accepted.append(finding)
+            else:
+                withheld.append(finding.article.url)
+        if withheld:
+            delivery_status[channel]["withheld_urls"] = withheld
+        return accepted
+
     if "telegram" in selected and telegram.get("enabled"):
-        queued = store.pending_telegram_findings()
+        queued = eligible(store.pending_telegram_findings(), "telegram")
         channel_status = delivery_status["telegram"]
         channel_status["queued"] = len(queued)
         if not queued:
@@ -285,7 +363,7 @@ def _deliver_queued(
 
     email = outputs.get("email", {})
     if "email" in selected and email.get("enabled"):
-        queued = store.pending_email_findings()
+        queued = eligible(store.pending_email_findings(), "email")
         channel_status = delivery_status["email"]
         channel_status["queued"] = len(queued)
         if not queued:
@@ -324,7 +402,7 @@ def _deliver_queued(
         else:
             spreadsheet_id = sheets["spreadsheet_id"]
             worksheet = sheets.get("worksheet", "News")
-            queued = store.pending_google_sheets_findings(spreadsheet_id, worksheet)
+            queued = eligible(store.pending_google_sheets_findings(spreadsheet_id, worksheet), "google_sheets")
             channel_status["queued"] = len(queued)
             if not queued:
                 channel_status["status"] = "not_needed"

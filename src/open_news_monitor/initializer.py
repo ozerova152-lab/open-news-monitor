@@ -77,6 +77,7 @@ def create_monitor_interactively(
             "database_path": f"runtime/{slug}.sqlite3",
         },
         "sources": sources,
+        "freshness": {"max_age_hours": 48},
         "filters": {"include_any": include_any, "exclude_any": exclude_any},
         "outputs": {"markdown": {"enabled": True, "path": f"runtime/{slug}-digest.md"}, **outputs},
     }

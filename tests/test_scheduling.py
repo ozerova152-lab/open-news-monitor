@@ -13,6 +13,31 @@ from open_news_monitor.store import ArticleStore
 
 
 class SchedulingTests(unittest.TestCase):
+    def test_empty_notice_once_after_success_and_never_after_failed_collection(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config = self._config(root, deliver_at={"telegram": ["10:00", "12:00"]})
+            config["sources"] = [{"id": "feed", "name": "Feed", "url": "https://example.test/feed", "kind": "rss"}]
+            config["freshness"] = {"max_age_hours": 48}
+            config["empty_news_notice"] = {"enabled": True, "language": "en"}
+            store = ArticleStore(root / "memory.sqlite3")
+            try:
+                with store.connection:
+                    store.connection.execute("CREATE TABLE source_baselines (source_id, source_url, first_success)")
+                    store.connection.execute("INSERT INTO source_baselines VALUES (?, ?, ?)",
+                                             ("feed", "https://example.test/feed", "2026-11-01T00:00:00+00:00"))
+            finally:
+                store.close()
+            with patch("open_news_monitor.scheduling._run_monitor_locked",
+                       side_effect=[([], ["unavailable"], ""), ([], [], ""), ([], [], "")]), \
+                 patch("open_news_monitor.scheduling.send_telegram_notice") as send:
+                schedule_tick(config, now=datetime(2026, 11, 2, 7, 5, tzinfo=timezone.utc))
+                send.assert_not_called()
+                schedule_tick(config, now=datetime(2026, 11, 3, 7, 5, tzinfo=timezone.utc))
+                schedule_tick(config, now=datetime(2026, 11, 3, 7, 6, tzinfo=timezone.utc))
+                schedule_tick(config, now=datetime(2026, 11, 3, 9, 5, tzinfo=timezone.utc))
+                send.assert_called_once_with("No new stories today.")
+
     def _config(self, root: Path, **schedule: object) -> dict:
         return {
             "monitor": {"name": "Schedule test", "database_path": str(root / "memory.sqlite3")},

@@ -103,7 +103,12 @@ def build_task_spec(
     principal_user = user_id or current_windows_user()
     if not principal_user.strip():
         raise TaskSchedulerError("Не удалось определить текущего пользователя Windows для задачи Планировщика.")
-    return TaskSpec(profile, executable, f"{TASK_PREFIX}{fingerprint}", profile.parent, principal_user)
+    working_directory = profile.parent
+    if profile.parent.name == "local" and profile.parent.parent.name == "config":
+        project_root = profile.parent.parent.parent
+        if (project_root / "pyproject.toml").is_file():
+            working_directory = project_root
+    return TaskSpec(profile, executable, f"{TASK_PREFIX}{fingerprint}", working_directory, principal_user)
 
 
 def current_windows_user() -> str:
@@ -140,7 +145,9 @@ def render_task_preview(action: str, spec: TaskSpec) -> str:
         f"Профиль: {spec.profile_path}",
         f"Пользователь Windows: {spec.user_id}",
         f"Python: {spec.python_path}",
+        f"Рабочая папка: {spec.working_directory}",
         f"Проверка расписания: каждые {spec.run_every_minutes} минут.",
+        "Остановка: schedule disable с тем же профилем.",
     ]
     if action == "install":
         lines.append("Задача будет автоматически запускать schedule-tick после входа в Windows и затем примерно каждые 5 минут.")
@@ -178,7 +185,25 @@ class WindowsTaskScheduler:
             raise TaskSchedulerError(
                 f"Задача {spec.task_name} уже существует. Она не была изменена. Используйте status для проверки."
             )
-        self._register_via_com(spec, TASK_CREATE, "Не удалось создать задачу Планировщика")
+        try:
+            self._register_via_com(spec, TASK_CREATE, "Не удалось создать задачу Планировщика")
+        except TaskSchedulerError as error:
+            if "HRESULT 0x80070005" not in str(error):
+                raise
+            # Use the supported cmdlet with the same account and privilege
+            # level. Without -Force an existing task is never replaced.
+            if self.query_xml(spec.task_name) is not None:
+                raise
+            result = self._runner(_encoded_command(_NATIVE_REGISTRATION_SCRIPT, {
+                "name": spec.task_name, "python": str(spec.python_path),
+                "arguments": spec.arguments, "cwd": str(spec.working_directory),
+                "user": spec.user_id, "minutes": spec.run_every_minutes,
+                "description": f"{TASK_MARKER}; profile_sha256={spec.profile_fingerprint}",
+            }))
+            if result.returncode:
+                raise TaskSchedulerError(_command_error(
+                    f"{error}\nРегистрация через Register-ScheduledTask также отклонена", result,
+                )) from error
 
     def validate(self, spec: TaskSpec) -> TaskValidationResult:
         """Ask the Task Scheduler COM API to validate XML without registration."""
@@ -367,10 +392,26 @@ catch {
 '''
 
 
+_NATIVE_REGISTRATION_SCRIPT = r'''$ErrorActionPreference = "Stop"
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+$p = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD_B64__')) | ConvertFrom-Json
+$action = New-ScheduledTaskAction -Execute $p.python -Argument $p.arguments -WorkingDirectory $p.cwd
+$principal = New-ScheduledTaskPrincipal -UserId $p.user -LogonType Interactive -RunLevel Limited
+$timer = New-ScheduledTaskTrigger -Once -At (Get-Date).AddSeconds(15) -RepetitionInterval (New-TimeSpan -Minutes $p.minutes)
+$logon = New-ScheduledTaskTrigger -AtLogOn -User $p.user
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+Register-ScheduledTask -TaskName $p.name -TaskPath '\' -Action $action -Principal $principal -Trigger @($timer, $logon) -Settings $settings -Description $p.description | Out-Null
+'''
+
+
 def _com_registration_command(payload: dict[str, object]) -> list[str]:
-    """Build a policy-safe PowerShell command with data-only user inputs."""
+    return _encoded_command(_COM_REGISTRATION_SCRIPT, payload)
+
+
+def _encoded_command(template: str, payload: dict[str, object]) -> list[str]:
+    """Build a PowerShell command with data-only user inputs."""
     payload_b64 = base64.b64encode(json.dumps(payload, ensure_ascii=False).encode("utf-8")).decode("ascii")
-    script = _COM_REGISTRATION_SCRIPT.replace("__PAYLOAD_B64__", payload_b64)
+    script = template.replace("__PAYLOAD_B64__", payload_b64)
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     return ["powershell.exe", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded]
 
