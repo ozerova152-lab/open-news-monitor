@@ -332,7 +332,7 @@ def is_owned_task(xml: str, spec: TaskSpec) -> bool:
     return (
         any(f"{TASK_MARKER}; profile_sha256={spec.profile_fingerprint}" == value for value in values)
         and spec.user_id in values
-        and str(spec.python_path) in values
+        and (str(spec.python_path) in values or str(spec.python_path.with_name("pythonw.exe")) in values)
         and spec.arguments in values
         and str(spec.working_directory) in values
     )
