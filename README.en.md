@@ -68,7 +68,7 @@ Run `doctor` after setup. Separately approve the first real delivery to the chos
 
 Without a scheduler, the program runs when you start it. Optional `schedule-tick` performs actions due under the profile; an external task invokes it regularly. On Windows, commands can install, inspect, enable, disable and remove the profile's task. Task changes require explicit consent.
 
-On the tested computer, Windows denied task registration. Do not rely on a schedule until it has passed a controlled check on your own computer. Linux/macOS options also need real-system verification. Setup and stopping instructions: [scheduling guide](docs/SCHEDULING_RU.md) (in Russian).
+On one Windows computer the initial registration method was denied, but a fallback succeeded. On November 25–27 the scheduled task collected sources and Telegram confirmed a delivery after retries. Verify scheduling on your computer. A temporary Ubuntu WSL timer was tested; macOS launchd and deployment to a separate server remain unverified. Setup and stopping instructions: [scheduling guide](docs/SCHEDULING_RU.md) (in Russian).
 
 ## Manual installation
 
@@ -82,7 +82,7 @@ On the tested computer, Windows denied task registration. Do not rely on a sched
 - Addresses of sources you want to follow. One working RSS/Atom feed is enough to start.
 - For external delivery, your own Telegram, email or Google Sheets settings. Keep keys and passwords local, not in chat.
 
-The Windows setup has been checked. [Linux and macOS instructions](docs/SETUP_UNIX_RU.md) are available in Russian, but installation and scheduling have not been separately checked on real systems.
+Windows setup was checked. Installation and a temporary timer were tested in Ubuntu WSL. A separate Linux server and macOS launchd have not yet been verified. [Linux and macOS instructions](docs/SETUP_UNIX_RU.md) are in Russian.
 
 ### Quick start on Windows
 
@@ -166,3 +166,9 @@ The detailed guides below are in Russian.
 ## License
 
 [MIT](LICENSE).
+
+## Freshness and history
+
+New wizard profiles use a 48-hour freshness limit. Existing profiles keep their settings until the user agrees to enable it. Items without a reliable date are withheld. Use `open-news-monitor withheld <profile>` to review them and `open-news-monitor history <profile>` to inspect run history.
+
+The optional Telegram no-news notice can be suppressed if sources were not checked successfully or items have uncertain dates. Failed deliveries are retried on schedule, but a lost service response can cause a duplicate. [Details](docs/SCHEDULING_RU.md) (in Russian).

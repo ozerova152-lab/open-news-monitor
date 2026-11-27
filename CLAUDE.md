@@ -22,3 +22,7 @@ Claude Code is the user's technical guide for this repository. Treat the user as
 - `schedule-tick` and `schedule install/status/enable/disable/remove` are available for Windows automation. Before any task mutation, show the task name, profile, Python path, cadence and stop method, then obtain explicit user approval. Do not promise the task works until one controlled local test succeeds; never alter an unrelated task or elevate privileges without separate approval.
 
 RSS/Atom and some public JSON sources can be connected automatically after real publications are confirmed. Plain HTML pages without an advertised feed still need verified collection rules. There is no graphical interface. Delivery queues reduce loss and repeats, but an interrupted external confirmation can still make an external duplicate possible.
+
+## Freshness and history
+
+New wizard profiles use a 48-hour freshness policy. For an existing profile, obtain the user's agreement before enabling it. Explain that uncertain items can be viewed with `withheld <profile>` and runs with `history <profile>`. A no-news Telegram notice is optional and can be suppressed when source checks fail or dates are uncertain. Retries may duplicate a message after an ambiguous external response. A Windows task ran successfully on one tested computer; check the target machine. An Ubuntu WSL timer was tested; a separate Linux server and macOS launchd remain unverified.

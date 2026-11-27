@@ -66,6 +66,15 @@ class _FakeWindowsScheduler:
 
 
 class WindowsSchedulerTests(unittest.TestCase):
+    def test_ownership_accepts_hidden_python_in_same_environment_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            spec = self._spec(Path(directory))
+            xml = task_xml(spec)
+            self.assertTrue(is_owned_task(xml, spec))
+            self.assertTrue(is_owned_task(xml.replace(str(spec.python_path), str(spec.python_path.with_name("pythonw.exe"))), spec))
+            self.assertFalse(is_owned_task(xml.replace(str(spec.python_path), str(spec.python_path.parent / "other" / "pythonw.exe")), spec))
+            self.assertFalse(is_owned_task(xml.replace(spec.arguments, "other-profile"), spec))
+
     def test_access_denied_uses_unprivileged_registration_without_force(self):
         with tempfile.TemporaryDirectory() as directory:
             spec = self._spec(Path(directory))
